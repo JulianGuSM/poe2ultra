@@ -15,6 +15,13 @@ const fixture = loadFixture('chaos-dot-lich-starter-deadrabbit');
 const build = parseBuild(fixture.build, fixture.staticData);
 beforeEach(() => { mock.listeners = []; mock.post.mockClear(); mock.disconnect.mockClear(); });
 describe('guide translation controls', () => {
+  it('opens plugin settings directly from the toolbar', async () => {
+    render(<BuildView build={build} initialHash="" onRouteChange={() => {}} onOriginal={() => {}} headerCollapsed onHeaderCollapsedChange={() => {}} />);
+    await waitFor(() => expect(mock.listeners.length).toBe(1));
+    fireEvent.click(screen.getByRole('button', { name: '插件设置' }));
+    expect(mock.post).toHaveBeenLastCalledWith({ type: 'options' });
+  });
+
   it('restores cached regional versions and switches languages without requesting paid work', async () => {
     const route = vi.fn();
     const props = { build, initialHash: '', onRouteChange: route, onOriginal: () => {}, onHeaderCollapsedChange: () => {} };
@@ -25,19 +32,18 @@ describe('guide translation controls', () => {
       mock.listeners.forEach(fn => fn({ type: 'progress', records: { [segmentKey(segment)]: { cn: ['简体攻略'], tw: ['繁體攻略'] } }, completed: 1, total: 100, cached: 1 }));
       mock.listeners.forEach(fn => fn({ type: 'done' }));
     });
-    fireEvent.click(screen.getByRole('button', { name: '简中', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '简', exact: true }));
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(build.title + '简体攻略');
     expect(screen.getByRole('tab', { name: '总览' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: '升级路线' })).toBeTruthy();
     view.rerender(<BuildView {...props} headerCollapsed />);
-    expect(view.container.querySelector('.tab-bar__title')?.textContent).toBe('简体攻略');
-    expect(view.container.querySelector('.tab-bar__title .bilingual-text')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '繁中', exact: true }));
-    expect(view.container.querySelector('.tab-bar__title')?.textContent).toBe('繁體攻略');
+    expect(view.container.querySelector('.tab-bar__title')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '繁', exact: true }));
+    expect(view.container.querySelector('.tab-bar__title')).toBeNull();
     expect(screen.getByRole('tab', { name: '總覽' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: '升級路線' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Original', exact: true }));
-    expect(view.container.querySelector('.tab-bar__title')?.textContent).toBe(build.title);
+    fireEvent.click(screen.getByRole('button', { name: '英', exact: true }));
+    expect(view.container.querySelector('.tab-bar__title')).toBeNull();
     expect(screen.getByRole('tab', { name: 'Overview' })).toBeTruthy();
     expect(mock.post.mock.calls.some(([m]) => m.type === 'translate')).toBe(false);
     expect(route).not.toHaveBeenCalled();
@@ -59,7 +65,7 @@ describe('guide translation controls', () => {
       mock.listeners[0]!({ type: 'progress', records: {}, completed: 0, total: 2249, cached: 0 });
       mock.listeners[0]!({ type: 'done' });
     });
-    fireEvent.click(screen.getByRole('button', { name: '简中', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '简', exact: true }));
     expect(view.container.querySelector('.tab-bar__side .translation')).toBeTruthy();
     expect(view.container.querySelector('.build-view > .translation')).toBeNull();
     expect(screen.queryByText(/还没有中文译文/)).toBeNull();

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.6.7
+
+- Restore per-line ellipsis for the original and translated build title so long bilingual headings do not stretch the narrow header.
+- Keep the guide identity and summary readable on laptop widths; remove the repeated summary from the header when space is very limited.
+- Keep guide tabs and translation controls on one row, with horizontally scrollable tabs when space is limited.
+- Shorten language controls to 英 / 简 / 繁 and explain their regional translations on hover.
+- Remove the compact build title when the header is collapsed and add a direct settings button beside the collapse/exit controls.
+- Fix clicks on support gems and gem-priority buttons opening no details; retain gem-name copying and native keyboard activation.
+- Prevent Ctrl+wheel over passive and atlas trees from zooming the browser page, including overlays and variant remounts, while allowing site wheel handlers to run.
+
 ## 1.6.6 — poe2ultra
 
 - Move the guide language switch and circular cache progress indicator into the right side of the tab bar, separated from the guide tabs and next to the collapse/exit controls.

@@ -55,7 +55,12 @@ export function TooltipProvider({ children, resetKey }: { children: ComponentChi
   );
 }
 
-export function WithTooltip({ model, children }: { model: TooltipModel | null; children: ComponentChildren }) {
+export function WithTooltip({ model, children, openOnChildClick = false }: {
+  model: TooltipModel | null;
+  children: ComponentChildren;
+  /** Gem copy buttons also open details; unrelated nested controls keep their own behavior. */
+  openOnChildClick?: boolean;
+}) {
   const api = useContext(TooltipContext);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -85,7 +90,7 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
         // Only the innermost trigger opens a new card; an already pinned card keeps ownership.
         const owner = (event.target as Element).closest('.tooltip-trigger');
         if (owner !== ref.current) return;
-        if ((event.target as Element).closest('button, a, input, select, textarea')) return;
+        if (!openOnChildClick && (event.target as Element).closest('button, a, input, select, textarea')) return;
         if (isOpen) {
           api.close();
         } else if (!api.openAnchor) {
@@ -93,6 +98,8 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
         }
       }}
       onKeyDown={(event) => {
+        // Native child buttons generate their own click for Enter/Space.
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           if (isOpen) {

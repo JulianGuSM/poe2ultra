@@ -35,6 +35,54 @@ describe('embedSiteTree', () => {
 
   afterEach(() => embed?.destroy());
 
+  it.each(['passive-tree', 'atlas-tree'] as const)('prevents browser zoom over %s without stopping the site wheel handler', (kind) => {
+    renderSite({ variantIndex: 1, kind });
+    start(1, kind);
+    const canvas = slot().querySelector('canvas')!;
+    const onWheel = vi.fn();
+    canvas.addEventListener('wheel', onWheel);
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, deltaY: 100 });
+
+    canvas.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(onWheel).toHaveBeenCalledOnce();
+  });
+
+  it('keeps ordinary tree scrolling and Ctrl+wheel outside the tree unchanged', () => {
+    start();
+    const ordinary = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 100 });
+    slot().querySelector('canvas')!.dispatchEvent(ordinary);
+    const outside = new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, clientX: 10, clientY: 10 });
+    document.body.dispatchEvent(outside);
+
+    expect(ordinary.defaultPrevented).toBe(false);
+    expect(outside.defaultPrevented).toBe(false);
+  });
+
+  it('protects the tree area through overlays and variant remounts, then releases it on destroy', async () => {
+    const handle = start();
+    const overlay = document.createElement('div');
+    document.body.append(overlay);
+    const wheelOverTree = () => {
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, clientX: 100, clientY: 200 });
+      overlay.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(wheelOverTree()).toBe(true);
+
+    handle.setVariant(2);
+    expect(wheelOverTree()).toBe(true);
+    renderSite({ variantIndex: 2 });
+    await flush();
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true });
+    slot().querySelector('canvas')!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+
+    handle.destroy();
+    expect(wheelOverTree()).toBe(false);
+  });
+
   it("lays the site's tree over the placeholder, above the guide", () => {
     start();
 

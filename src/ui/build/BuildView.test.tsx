@@ -75,13 +75,11 @@ describe('BuildView header', () => {
     expect(onHeaderCollapsedChange).toHaveBeenCalledWith(true);
   });
 
-  it('hides the header when collapsed, keeping a short title in the tab bar', () => {
+  it('hides the header and its title when collapsed', () => {
     const { container, onHeaderCollapsedChange, onOriginal } = renderView('', BUILD, true);
 
     expect(container.querySelector('header')).toBeNull();
-    expect(container.querySelector('.tab-bar__title')?.textContent).toBe(BUILD.title);
-    expect(container.querySelector('.tab-bar__title')?.getAttribute('title')).toBe(BUILD.title);
-    expect(container.querySelector('.tab-bar__title .bilingual-text')).toBeNull();
+    expect(container.querySelector('.tab-bar__title')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show original page' }));
     expect(onOriginal).toHaveBeenCalledOnce();

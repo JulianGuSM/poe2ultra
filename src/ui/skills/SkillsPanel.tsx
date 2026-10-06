@@ -143,7 +143,7 @@ function SkillRow({
       {supports.length > 0 && (
         <span class="skill-row__supports">
           {supports.map((support, i) => (
-            <WithTooltip key={`${support.slug}-${i}`} model={gemTooltip(support)}>
+            <WithTooltip key={`${support.slug}-${i}`} model={gemTooltip(support)} openOnChildClick>
               <button type="button" class="gem-copy" aria-label={copyLabel(support.name)} onClick={() => onCopy(support.name)}>
                 <GemIcon
                   gem={support}
@@ -184,7 +184,7 @@ function GemPriorityCard({
             onFocusOut={() => onPointAt(null)}
           >
             <span class="gem-priority__number">{i + 1}</span>
-            <WithTooltip model={gemTooltip(entry.gem)}>
+            <WithTooltip model={gemTooltip(entry.gem)} openOnChildClick>
               <button type="button" class="gem-priority__gem gem-copy" aria-label={copyLabel(entry.gem.name)} onClick={() => onCopy(entry.gem.name)}>
                 <GemIcon gem={entry.gem} class={`gem-priority__icon gem-socket gem-socket--${gemAttribute(entry.gem) ?? 'none'}`} />
                 <span class="gem-priority__text">
@@ -263,7 +263,7 @@ function SkillDetails({ skill, onCopy }: { skill: Skill; onCopy: (name: string) 
           <ul>
             {supports.map((support, i) => (
               <li key={`${support.slug}-${i}`}>
-                <WithTooltip key={`${support.slug}-${i}`} model={gemTooltip(support)}>
+                <WithTooltip key={`${support.slug}-${i}`} model={gemTooltip(support)} openOnChildClick>
                   <button type="button" class="skill-details__support gem-copy" aria-label={copyLabel(support.name)} onClick={() => onCopy(support.name)}>
                     <GemIcon gem={support} class={`skill-details__support-icon gem-socket gem-socket--${gemAttribute(support) ?? 'none'}`} />
                     <span class="skill-details__support-name"><BilingualText text={support.name} /></span>

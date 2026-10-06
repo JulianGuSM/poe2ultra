@@ -50,6 +50,21 @@ export function embedSiteTree({
   let hashBeforeClick = '';
   let destroyed = false;
 
+  // The canvas remains in the site's DOM, outside the guide's shadow root. Catch Ctrl+wheel
+  // before either tree handles it, including overlays and gaps while the site remounts a variant.
+  const preventPageZoom = (event: WheelEvent) => {
+    if (!event.ctrlKey || !event.cancelable || !placeholder.isConnected) return;
+    const box = placeholder.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) return;
+    const path = event.composedPath();
+    const overTree = path.includes(placeholder) || (slot !== null && path.includes(slot.element))
+      || (event.clientX >= box.left && event.clientX < box.right
+        && event.clientY >= box.top && event.clientY < box.bottom);
+    // Cancel only the browser default; the site's wheel handlers still receive the event.
+    if (overTree) event.preventDefault();
+  };
+  win.addEventListener('wheel', preventPageZoom, { capture: true, passive: false });
+
   const pageStyle = doc.createElement('style');
   pageStyle.textContent = PAGE_CSS;
   doc.head.append(pageStyle);
@@ -194,6 +209,7 @@ export function embedSiteTree({
       observer.disconnect();
       resizeObserver?.disconnect();
       win.removeEventListener('resize', place);
+      win.removeEventListener('wheel', preventPageZoom, true);
       releaseSlot();
       containers.forEach((value, node) => {
         if (value) node.style.setProperty('container-type', value);

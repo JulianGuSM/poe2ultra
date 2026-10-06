@@ -47,13 +47,14 @@ describe('SkillsPanel', () => {
     expect(await screen.findByRole('status')).toHaveProperty('textContent', 'Copied “Contagion”');
   });
 
-  it('copies the name of a support gem from its socket', () => {
+  it('copies the name and opens details when clicking a support gem inside its button', () => {
     const { copy } = renderPanel();
 
     const row = skillButton('Essence Drain').closest('li')!;
-    fireEvent.click(within(row).getByRole('button', { name: 'Copy “Chain II”' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Copy “Chain II”' }).querySelector('.skill-row__support')!);
 
     expect(copy).toHaveBeenCalledWith('Chain II');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Chain II');
   });
 
   it('copies the name of a gem from the priority list', () => {
@@ -64,6 +65,7 @@ describe('SkillsPanel', () => {
     fireEvent.click(within(first).getByRole('button', { name: `Copy “${name}”` }));
 
     expect(copy).toHaveBeenCalledWith(name);
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe(name);
   });
 
   it('copies the name of the gem shown in the details, and of its supports', () => {
@@ -74,6 +76,7 @@ describe('SkillsPanel', () => {
 
     fireEvent.click(within(details()).getByRole('button', { name: 'Copy “Chain II”' }));
     expect(copy).toHaveBeenLastCalledWith('Chain II');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Chain II');
   });
 
   it('says when the browser would not let it copy', async () => {

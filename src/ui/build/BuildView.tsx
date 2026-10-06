@@ -1,6 +1,5 @@
-import { TranslationContext } from '@/ui/translation/BilingualText';
-import { ChevronsDown, ChevronsUp, LogOut, TriangleAlert } from 'lucide-preact';
-import { useContext, useEffect, useRef, useState } from 'preact/hooks';
+import { ChevronsDown, ChevronsUp, LogOut, Settings, TriangleAlert } from 'lucide-preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Build } from '@/lib/build/model';
 import { availableTabs, formatRoute, parseRoute, type RememberedVariant, type Route, type TabId } from '@/lib/ui/route';
 import { TooltipProvider } from '@/ui/tooltip/Tooltip';
@@ -97,10 +96,10 @@ export function BuildView({
                 <TriangleAlert size={16} role="img" aria-label="Game data unavailable" />
               </span>
             )}
-            {headerCollapsed && (
-              <CompactBuildTitle title={build.title} />
-            )}
             <TranslationBar translation={translation} />
+            <button type="button" class="icon-button" aria-label="插件设置" title="插件设置" onClick={translation.settings}>
+              <Settings size={16} aria-hidden="true" />
+            </button>
             <button
               type="button"
               class="icon-button"
@@ -138,13 +137,6 @@ export function BuildView({
       </div>
     </TooltipProvider></TranslationProvider>
   );
-}
-
-/** The collapsed bar has room for one title line, unlike the full bilingual header. */
-function CompactBuildTitle({ title }: { title: string }) {
-  const { locale, texts } = useContext(TranslationContext);
-  const display = locale === 'en' ? title : texts.get(title) ?? title;
-  return <span class="tab-bar__title" title={display}>{display}</span>;
 }
 
 /**

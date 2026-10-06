@@ -56,7 +56,8 @@ export function TranslationBar({ translation: t }: { translation: ReturnType<typ
     </button>
     <div class="translation__languages" role="group" aria-label="Guide language">
       {(['en', 'cn', 'tw'] as const).map((locale, i) => <button key={locale} type="button" aria-pressed={t.locale === locale}
-        title={locale === 'en' ? '只显示英文原文' : '在原文下方显示已缓存译文'} onClick={() => t.choose(locale)}>{['Original', '简中', '繁中'][i]}</button>)}
+        title={['英文原文', '在英文原文下方显示简体中文翻译，适配国服', '在英文原文下方显示繁体中文翻译，适配国际服'][i]}
+        onClick={() => t.choose(locale)}>{['英', '简', '繁'][i]}</button>)}
     </div>
     {open && <section class="translation__details" id="translation-details" role="dialog" aria-modal="false" aria-label="翻译详情">
       <div class="translation__details-header"><strong>翻译详情</strong><button type="button" class="translation__close" aria-label="关闭翻译详情" title="关闭翻译详情 (Esc)" onClick={() => setOpen(false)}><X size={16} aria-hidden="true" /></button></div>
@@ -80,7 +81,7 @@ export function TranslationBar({ translation: t }: { translation: ReturnType<typ
         : t.cost.priced === 0 ? '本次模型请求未返回 token 用量，无法估算费用'
           : `本次翻译费用估算 ${t.cost.text} · ${format(t.cost.priced)} / ${format(t.cost.requests)} 次模型请求返回了用量（实际扣费以服务商账单为准）`}</p>}
       {!t.checking && !t.busy && !t.error && t.state.total > 0 && t.state.completed === 0 && <p class="translation__hint">
-        还没有中文译文。「简中 / 繁中」只切换原文下方的已有译文；请点击“开始翻译”生成并缓存两版译文。
+        还没有中文译文。「简 / 繁」只切换原文下方的已有译文；请点击“开始翻译”生成并缓存两版译文。
       </p>}
       {!t.checking && !t.busy && t.state.completed > 0 && !complete && t.locale !== 'en' && <p class="translation__hint">未翻译的内容暂时显示英文；点击“继续翻译剩余内容”补齐，已缓存部分不会重复翻译。</p>}
       {(t.error || t.warning) && <p class="translation__message" role={t.error ? 'alert' : undefined}>{t.error || t.warning}</p>}
