@@ -1,4 +1,5 @@
-import { BilingualText } from '@/ui/translation/BilingualText';
+import { BilingualText, useDisplayLocale } from '@/ui/translation/BilingualText';
+import { uiRequirements, uiText } from '@/lib/ui/i18n';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Attributes, EntityInfo, Gem, GemPriorityEntry, Skill, Variant } from '@/lib/build/model';
 import { gemAttribute, gemTooltip } from '@/lib/tooltip/tooltip-model';
@@ -21,6 +22,7 @@ export function SkillsPanel({
   /** Injected in tests; a gem name goes to the clipboard, ready for the game's own search. */
   copy?: (text: string) => Promise<boolean>;
 }) {
+  const locale = useDisplayLocale();
   const renderEntity = useMemo(() => entityChipRenderer(entities), [entities]);
   const { notice, copyName } = useCopyName(copy);
   const [selected, setSelected] = useState(0);
@@ -39,7 +41,7 @@ export function SkillsPanel({
           <div class="skills__main">
             <section class="card skills__list">
               <div class="skills__heading">
-                <h2 class="card__title">Active Skills</h2>
+                <h2 class="card__title">{uiText('Active Skills', locale)}</h2>
                 {variant.gemRequirements && <span class="skills__requirements">{formatAttributes(variant.gemRequirements)}</span>}
               </div>
               <ul class="skill-rows" aria-label="Active skills">
@@ -71,7 +73,7 @@ export function SkillsPanel({
       )}
       {variant.skillNotes && (
         <section class="card skills__notes">
-          <h2 class="card__title">Author's Notes</h2>
+          <h2 class="card__title">{uiText("Author's Notes", locale)}</h2>
           <RichText value={variant.skillNotes} renderEntity={renderEntity} />
         </section>
       )}
@@ -167,9 +169,10 @@ function GemPriorityCard({
   onPointAt: (pointer: GemPointer | null) => void;
   onCopy: (name: string) => void;
 }) {
+  const locale = useDisplayLocale();
   return (
     <section class="card gem-priority">
-      <h2 class="card__title">Gem Priority</h2>
+      <h2 class="card__title">{uiText('Gem Priority', locale)}</h2>
       <ol class="gem-priority__list" aria-label="Gem priority">
         {entries.map((entry, i) => (
           <li
@@ -202,6 +205,7 @@ function GemPriorityCard({
 }
 
 function SkillDetails({ skill, onCopy }: { skill: Skill; onCopy: (name: string) => void }) {
+  const locale = useDisplayLocale();
   const { gem, supports } = skill;
   const details = gem.details;
   return (
@@ -233,7 +237,7 @@ function SkillDetails({ skill, onCopy }: { skill: Skill; onCopy: (name: string) 
         </dl>
       )}
       {details && details.requirements.length > 0 && (
-        <p class="skill-details__requirements">Requires: {details.requirements.map(({ name, value }) => `${name} ${value}`).join(', ')}</p>
+        <p class="skill-details__requirements">{uiRequirements(details.requirements.map(({ name, value }) => `${name} ${value}`).join(', '), locale)}</p>
       )}
       {details?.description && <p class="skill-details__description"><BilingualText text={details.description} /></p>}
       {details && details.effects.length > 0 && (
@@ -245,7 +249,7 @@ function SkillDetails({ skill, onCopy }: { skill: Skill; onCopy: (name: string) 
       )}
       {details && details.qualityEffects.length > 0 && (
         <div class="skill-details__quality">
-          <p class="skill-details__section-title">Additional Effects From Quality</p>
+          <p class="skill-details__section-title">{uiText('Additional Effects From Quality', locale)}</p>
           <ul>
             {details.qualityEffects.map((line, i) => (
               <li key={i}><BilingualText text={line} /></li>
@@ -255,7 +259,7 @@ function SkillDetails({ skill, onCopy }: { skill: Skill; onCopy: (name: string) 
       )}
       {supports.length > 0 && (
         <div class="skill-details__supports">
-          <p class="skill-details__section-title">Support Gems</p>
+          <p class="skill-details__section-title">{uiText('Support Gems', locale)}</p>
           <ul>
             {supports.map((support, i) => (
               <li key={`${support.slug}-${i}`}>

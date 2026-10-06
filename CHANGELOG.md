@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+## 1.6.6 — poe2ultra
+
+- Move the guide language switch and circular cache progress indicator into the right side of the tab bar, separated from the guide tabs and next to the collapse/exit controls.
+- Open a dismissible translation details card from the progress ring, including saved block counts, live batch progress, actions, current-run cost and cumulative guide cost.
+- Persist one cost estimate receipt per model response in IndexedDB, including malformed responses with usage; include receipts in JSON backup/restore and deduplicate them on import.
+- Preserve expense history when clearing translation text; old requests without recorded usage cannot be reconstructed.
+
+## 1.6.5 — poe2ultra
+
+- Keep the collapsed guide header compact: show only the selected language's title on one ellipsized line, with the full title available on hover.
+
+## 1.6.4 — poe2ultra
+
+- Localize the guide tabs and fixed skill and tooltip labels for Simplified and Traditional Chinese without sending UI text to DeepSeek.
+- Increase the contrast of cached translations inside pinned detail cards, including implicit modifiers and flavour text.
+
+## 1.6.3 — poe2ultra
+
+- Show the estimated cost of each completed full-guide translation run, summing provider-reported token usage for valid and malformed responses.
+- Continue later batches after an isolated malformed model response with or without Debug, leaving failed blocks uncached for manual retry; pause after three consecutive output failures.
+
+## 1.6.2 — poe2ultra
+
+- Export locally accumulated guide and completed dual-output selection translations as a three-column English/Simplified/Traditional Chinese CSV.
+- Store the English source with new guide cache entries and fill it in for older entries when their guides are revisited, without another model request.
+- Keep JSON cache backup and restore independent from the readable CSV export.
+
+## 1.6.1 — poe2ultra
+
+- Add local JSON backup and restore for all cached guide translations, including both Chinese versions and the parameters required to match existing cache keys.
+- Restore imported terminology and guide cache parameters without exporting API keys or authentication headers; validate backups before merging and keep existing entries.
+- Prevent a guide translation from starting during a cache transfer.
+
 ## 1.6.0 — poe2ultra
 
 - Tooltips now open on click instead of hover, with keyboard Enter/Space toggle and Escape to close.

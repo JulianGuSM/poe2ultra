@@ -24,3 +24,16 @@ it('removes the empty summary column when no readable summary exists', () => {
   expect(container.querySelector('.build-header__summary')).toBeNull();
   expect(container.querySelector('.build-header--no-summary')).toBeTruthy();
 });
+
+it('keeps the source and translated build titles in separate truncatable lines', () => {
+  const translatedTitle = '简体中文攻略标题';
+  const { container } = render(
+    <TranslationContext.Provider value={{ locale: 'cn', texts: new Map([[base.title, translatedTitle]]) }}>
+      <BuildHeader build={base} />
+    </TranslationContext.Provider>,
+  );
+  const title = container.querySelector('.build-header__title')!;
+  expect(title.querySelector('.build-header__title-original')?.textContent).toBe(base.title);
+  expect(title.querySelector('.translation-text')?.textContent).toBe(translatedTitle);
+  expect([...title.children].map(child => child.className)).toEqual(['build-header__title-original', 'translation-text']);
+});

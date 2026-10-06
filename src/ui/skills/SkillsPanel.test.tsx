@@ -5,6 +5,7 @@ import { parseBuild } from '@/lib/build/parse-build';
 import { TooltipProvider } from '@/ui/tooltip/Tooltip';
 import { loadFixture } from '../../../tests/fixtures/load';
 import { SkillsPanel } from './SkillsPanel';
+import { TranslationProvider } from '@/ui/translation/BilingualText';
 
 const fixture = loadFixture('chaos-dot-lich-starter-deadrabbit');
 const BUILD: Build = parseBuild(fixture.build, fixture.staticData);
@@ -24,6 +25,18 @@ const skillButton = (name: string) => within(skillList()).getByRole('button', { 
 const details = () => screen.getByRole('region', { name: 'Skill details' });
 
 describe('SkillsPanel', () => {
+  it('localizes the quality effects heading in skill details', () => {
+    const first = ENDGAME.skills[0]!;
+    const variant = { ...ENDGAME, skills: [{ ...first, gem: { ...first.gem, details: { ...first.gem.details!, qualityEffects: ['(0-20)% increased Cooldown Recovery Rate'] } } }] };
+    render(
+      <TranslationProvider records={{}} locale="cn">
+        <TooltipProvider><SkillsPanel variant={variant} entities={BUILD.entities} /></TooltipProvider>
+      </TranslationProvider>,
+    );
+    expect(screen.getByText('品质附加效果')).toBeTruthy();
+    expect(screen.queryByText('Additional Effects From Quality')).toBeNull();
+  });
+
   // The gem name is what you paste into the game's own search.
   it('copies the name of an active skill, and says it did', async () => {
     const { copy } = renderPanel();

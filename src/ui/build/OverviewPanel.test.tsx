@@ -72,6 +72,7 @@ describe('OverviewPanel', () => {
     fireEvent.click(glance().querySelector('.glance__uniques .tooltip-trigger')!);
     expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe("Atziri's Disdain");
 
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
     fireEvent.click(glance().querySelector('.glance__ascendancy .tooltip-trigger')!);
     expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Soulless Form');
   });

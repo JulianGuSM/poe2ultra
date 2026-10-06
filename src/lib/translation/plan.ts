@@ -3,6 +3,7 @@ import type { Build } from '../build/model';
 export type Locale = 'en' | 'cn' | 'tw';
 export interface Segment { kind: 'term' | 'prose'; texts: string[]; protected: number[] }
 export interface Translation { cn: string[]; tw: string[] }
+export interface CachedTranslation extends Translation { source?: string }
 export type Records = Record<string, Translation>;
 type Path = (string | number)[];
 interface Slot { key: string; paths: Path[] }

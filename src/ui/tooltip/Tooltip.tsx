@@ -1,5 +1,6 @@
-import { BilingualText } from '@/ui/translation/BilingualText';
+import { BilingualText, useDisplayLocale } from '@/ui/translation/BilingualText';
 import { TranslationContext } from '@/ui/translation/BilingualText';
+import { uiRequirements, uiText } from '@/lib/ui/i18n';
 import type { ComponentChildren } from 'preact';
 import { createContext, render } from 'preact';
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -84,6 +85,7 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
         // Only the innermost trigger opens a new card; an already pinned card keeps ownership.
         const owner = (event.target as Element).closest('.tooltip-trigger');
         if (owner !== ref.current) return;
+        if ((event.target as Element).closest('button, a, input, select, textarea')) return;
         if (isOpen) {
           api.close();
         } else if (!api.openAnchor) {
@@ -117,6 +119,7 @@ function TooltipOutsideOverlay({ anchor, model, onClose }: { anchor: HTMLElement
 
 function TooltipLayer({ anchor, model, onClose }: { anchor: HTMLElement; model: TooltipModel; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const locale = useDisplayLocale();
   const [placement, setPlacement] = useState<Placement | null>(null);
 
   useLayoutEffect(() => {
@@ -148,7 +151,7 @@ function TooltipLayer({ anchor, model, onClose }: { anchor: HTMLElement; model: 
       style={placement ? { left: `${placement.left}px`, top: `${placement.top}px` } : { visibility: 'hidden' }}
     >
       <div class="tooltip__controls">
-        <button type="button" class="tooltip__close" aria-label="Close details" title="Close details (Esc)" onClick={onClose}>
+        <button type="button" class="tooltip__close" aria-label={uiText('Close details', locale)} title={`${uiText('Close details', locale)} (Esc)`} onClick={onClose}>
           <X size={16} aria-hidden="true" />
         </button>
       </div>
@@ -175,13 +178,14 @@ function Portal({ parent, children }: { parent: Element; children: ComponentChil
 }
 
 function TooltipCard({ model }: { model: TooltipModel }) {
+  const locale = useDisplayLocale();
   return (
     <>
       <div class="tooltip__header">
         <Icon src={model.iconUrl} class="tooltip__icon" missing="none" />
         <div>
           <p class="tooltip__title"><BilingualText text={model.title} /></p>
-          {model.subtitle && <p class="tooltip__subtitle"><BilingualText text={model.subtitle} /></p>}
+          {model.subtitle && <p class="tooltip__subtitle">{uiText(model.subtitle, locale) === model.subtitle ? <BilingualText text={model.subtitle} /> : uiText(model.subtitle, locale)}</p>}
         </div>
       </div>
       {model.tags.length > 0 && (
@@ -201,11 +205,11 @@ function TooltipCard({ model }: { model: TooltipModel }) {
           ))}
         </dl>
       )}
-      {model.requirements && <p class="tooltip__requirements">Requires: {model.requirements}</p>}
+      {model.requirements && <p class="tooltip__requirements">{uiRequirements(model.requirements, locale)}</p>}
       {model.description && <p class="tooltip__description"><BilingualText text={model.description} /></p>}
       {model.sections.map((section, i) => (
         <div key={i} class={`tooltip__section tooltip__section--${section.tone}`}>
-          {section.title && <p class="tooltip__section-title">{section.title}</p>}
+          {section.title && <p class="tooltip__section-title">{uiText(section.title, locale)}</p>}
           <ul>
             {(section.blocks ?? section.lines).map((line, j) => (
               <li key={j}><BilingualText text={line} /></li>
@@ -214,8 +218,8 @@ function TooltipCard({ model }: { model: TooltipModel }) {
         </div>
       ))}
       {model.flavour && <p class="tooltip__flavour"><BilingualText text={model.flavour} /></p>}
-      {model.corrupted && <p class="tooltip__corrupted">Corrupted</p>}
-      {model.note && <p class="tooltip__note">{model.note}</p>}
+      {model.corrupted && <p class="tooltip__corrupted">{uiText('Corrupted', locale)}</p>}
+      {model.note && <p class="tooltip__note">{uiText(model.note, locale)}</p>}
     </>
   );
 }

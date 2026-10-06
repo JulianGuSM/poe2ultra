@@ -1,4 +1,5 @@
 import { collectContext } from '../translation/context.js';
+import { PersistentCache } from '../translation/cache';
 import { requireEndpointPermission } from '../translation/preferences';
 /**
  * Service Worker：唯一持有 API Key 的地方，负责调用 DeepSeek 接口。
@@ -34,6 +35,7 @@ import {
 const PORT_NAME = 'poe2ultra-selection';
 const MENU_ID = 'poe2ultra-translate-selection';
 const CONTENT_SCRIPT = 'content-scripts/selection.js';
+const selectionArchive = new PersistentCache();
 
 /** 按设置里的 API 形态挑客户端；两种形态对外接口完全一致。 */
 function pickClient(settings) {
@@ -234,6 +236,10 @@ async function runJob(port, jobs, msg) {
       warnings.push('模型没有按【简中】【繁中】分段输出，已按整段展示；可重试或检查提示词里的格式要求。');
     } else if (dual && !dual.ok) {
       warnings.push(`模型输出缺少「${dual.missing === 'cn' ? '简中' : '繁中'}」那一段，请重试。`);
+    }
+    if (dual?.ok) {
+      try { await selectionArchive.saveSelection(text, dual.cn, dual.tw); }
+      catch (error) { warnings.push(`译文已生成，但无法写入本地 CSV 累计记录：${error?.message || error}`); }
     }
     post({
       type: 'done',

@@ -5,6 +5,8 @@ import type { Locale, Records, Segment } from '@/lib/translation/plan';
 interface DisplayTranslations { locale: Locale; texts: Map<string, string> }
 export const TranslationContext = createContext<DisplayTranslations>({ locale: 'en', texts: new Map() });
 
+export const useDisplayLocale = () => useContext(TranslationContext).locale;
+
 export function TranslationProvider({ records, locale, children }: { records: Records; locale: Locale; children: ComponentChildren }) {
   const value = useMemo(() => {
     const texts = new Map<string, string>();

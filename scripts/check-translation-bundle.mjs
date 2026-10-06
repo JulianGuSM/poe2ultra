@@ -30,7 +30,7 @@ const chrome = {
 };
 let calls = 0;
 let lastRequestBody;
-let incompleteResponse = false;
+let incompleteResponsesRemaining = 0;
 const debugConsole = [];
 const fetchMock = async (url, init) => {
   if (url === chrome.runtime.getURL('data/glossary.json')) return new Response(readFileSync('public/data/glossary.json', 'utf8'));
@@ -48,8 +48,11 @@ const fetchMock = async (url, init) => {
     assert.ok(body.messages.at(-1).content.includes('25%'));
   }
   calls++;
-  const content = isGuide ? JSON.stringify({ translations: [{ id: 0, cn: '使用深渊巫妖造成25%伤害。', ...(incompleteResponse ? {} : { tw: '使用深淵妖巫造成25%傷害。' }) }] }) : '【简中】\n深渊巫妖造成25%伤害。\n【繁中】\n深淵妖巫造成25%傷害。';
-  return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
+  const incomplete = isGuide && incompleteResponsesRemaining > 0;
+  if (incomplete) incompleteResponsesRemaining--;
+  const content = isGuide ? JSON.stringify({ translations: [{ id: 0, cn: '使用深渊巫妖造成25%伤害。', ...(incomplete ? {} : { tw: '使用深淵妖巫造成25%傷害。' }) }] }) : '【简中】\n深渊巫妖造成25%伤害。\n【繁中】\n深淵妖巫造成25%傷害。';
+  const usage = { prompt_tokens: 1000, completion_tokens: 200, prompt_cache_hit_tokens: 100, prompt_cache_miss_tokens: 900 };
+  return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: 'stop' }] })}\n\ndata: ${JSON.stringify({ usage })}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
 };
 function startWorker() {
   chrome.runtime.onMessage = event(); chrome.runtime.onConnect = event();
@@ -63,8 +66,14 @@ async function settingsMessage(message) {
   return new Promise(resolve => chrome.runtime.onMessage.listeners.forEach(listener => listener({ type: 'translation-settings', ...message },
     { id: chrome.runtime.id, url: chrome.runtime.getURL('/options.html'), tab: { id: 7 } }, resolve)));
 }
+async function cacheMessage(action, backup) {
+  return new Promise(resolve => chrome.runtime.onMessage.listeners.forEach(listener => listener({ type: 'translation-cache', action, backup },
+    { id: chrome.runtime.id, url: chrome.runtime.getURL('/options.html'), tab: { id: 7 } }, resolve)));
+}
+let lastJobMessages = [];
 async function job(type, segments, hostname = 'mobalytics.gg') {
   const messages = [];
+  lastJobMessages = messages;
   const port = { name: 'poe2ultra-translation', sender: { id: chrome.runtime.id, url: `https://${hostname}/poe-2/builds/test-guide` },
     onMessage: event(), onDisconnect: event(), disconnect() { throw Error('Valid guide port was rejected'); },
     postMessage(message) { messages.push(message); } };
@@ -73,9 +82,9 @@ async function job(type, segments, hostname = 'mobalytics.gg') {
   for (let i = 0; i < 200; i++) {
     const last = messages.at(-1);
     if (last?.type === 'error') throw new Error(last.text);
-    if (last?.type === 'done') {
+    if (last?.type === 'done' || last?.type === 'partial') {
       const progress = messages.findLast(m => m.type === 'progress');
-      if (type === 'translate' && segments[0]?.kind === 'prose' && !progress.cached) {
+      if (last.type === 'done' && type === 'translate' && segments[0]?.kind === 'prose' && !progress.cached) {
         const stages = messages.filter(m => m.type === 'activity').map(m => m.stage);
         for (const stage of ['context', 'requesting', 'receiving', 'validating', 'saving']) assert.ok(stages.includes(stage), `Missing live activity: ${stage}`);
       }
@@ -92,7 +101,7 @@ const saved = await settingsMessage({ action: 'save', settings: { ...original.se
 assert.equal(saved.settings.apiMode, 'chat');
 let leaked = false;
 for (const listener of chrome.runtime.onMessage.listeners) {
-  for (const message of [{ type: 'translation-settings', action: 'get' }, { type: 'translation-debug', action: 'clear' }, { type: 'get-settings' }, { type: 'save-settings', patch: { apiKey: 'attacker' } }]) {
+  for (const message of [{ type: 'translation-settings', action: 'get' }, { type: 'translation-cache', action: 'export' }, { type: 'translation-debug', action: 'clear' }, { type: 'get-settings' }, { type: 'save-settings', patch: { apiKey: 'attacker' } }]) {
     listener(message, { id: chrome.runtime.id, url: 'https://mobalytics.gg/poe-2/builds/test-guide' }, () => { leaked = true; });
   }
 }
@@ -102,12 +111,42 @@ assert.equal((await job('inspect', segments)).completed, 0);
 assert.equal(calls, 0);
 assert.equal((await job('translate', segments, 'www.mobalytics.gg')).completed, 1);
 assert.equal(calls, 1);
+assert.equal(lastJobMessages.findLast(message => message.type === 'cost').requests, 1);
+assert.equal(lastJobMessages.findLast(message => message.type === 'cost').priced, 1);
+assert.match(lastJobMessages.findLast(message => message.type === 'cost').text, /^≈¥/);
+assert.equal(lastJobMessages.findLast(message => message.type === 'guide-cost').summary.requests, 1);
+assert.ok(lastJobMessages.findLast(message => message.type === 'guide-cost').summary.cny > 0);
 startWorker();
 const restored = await job('translate', segments);
 assert.equal(restored.completed, 1);
 assert.equal(restored.cached, 1);
 assert.equal(calls, 1);
+assert.equal(lastJobMessages.findLast(message => message.type === 'cost').requests, 0);
+assert.equal(lastJobMessages.findLast(message => message.type === 'guide-cost').summary.requests, 1, 'Expense history must survive worker restart');
 assert.equal(Object.values(restored.records)[0].tw[0], '使用深淵妖巫造成25%傷害。');
+const firstCsv = await cacheMessage('export-csv');
+assert.equal(firstCsv.count, 1);
+assert.ok(firstCsv.csv.startsWith('\uFEFF英语原文,简中,繁中\r\n'));
+assert.ok(firstCsv.csv.includes('Use Abyssal Lich for 25% damage.,使用深渊巫妖造成25%伤害。,使用深淵妖巫造成25%傷害。'));
+const exported = (await cacheMessage('export')).backup;
+assert.equal(exported.records.length, 1);
+assert.equal(exported.records[0][1].source, 'Use Abyssal Lich for 25% damage.');
+assert.equal(exported.guideCosts.length, 1);
+assert.ok(!JSON.stringify(exported).includes('test-placeholder'));
+assert.equal((await settingsMessage({ action: 'clear' })).count, 0);
+await job('inspect', segments);
+assert.equal(lastJobMessages.findLast(message => message.type === 'guide-cost').summary.requests, 1, 'Clearing translations keeps expense history');
+assert.equal((await cacheMessage('import', { ...exported, schemaVersion: 99 })).error.includes('受支持'), true);
+await settingsMessage({ action: 'save', settings: { ...saved.settings, model: 'temporary-other-model' } });
+assert.equal((await job('inspect', segments)).cached, 0);
+const restoredBackup = await cacheMessage('import', exported);
+assert.equal(restoredBackup.imported.added, 1);
+assert.equal(restoredBackup.importedCosts.added, 0, 'Importing the same receipt must not add cost again');
+assert.equal(restoredBackup.importedCosts.kept, 1);
+assert.equal((await settingsMessage({ action: 'get' })).settings.model, exported.settings.model);
+const imported = await job('translate', segments);
+assert.equal(imported.cached, 1);
+assert.equal(calls, 1, 'Imported translations must be reused without another paid request');
 const termOnly = [{ kind: 'term', texts: ['Abyssal Lich'], protected: [] }];
 assert.equal((await job('translate', termOnly)).completed, 1);
 assert.equal(calls, 1);
@@ -127,6 +166,10 @@ assert.equal(selected.dual.cn, '深渊巫妖造成25%伤害。');
 assert.equal(selected.dual.tw, '深淵妖巫造成25%傷害。');
 assert.ok(selectionMessages.some(m => m.type === 'chunk'));
 assert.equal(calls, 2);
+const combinedCsv = await cacheMessage('export-csv');
+assert.equal(combinedCsv.count, 3);
+assert.ok(combinedCsv.csv.includes('Abyssal Lich grants 25% damage.,深渊巫妖造成25%伤害。,深淵妖巫造成25%傷害。'));
+assert.ok(!combinedCsv.csv.includes('test-placeholder'));
 assert.ok(manifest.content_scripts.some(entry => entry.matches.includes('https://*/*') && entry.js.includes('content-scripts/selection.js')));
 assert.equal(manifest.commands['translate-selection'].suggested_key.default, 'Alt+Q');
 await settingsMessage({ action: 'save', settings: { ...saved.settings, debugEnabled: true,
@@ -134,9 +177,12 @@ await settingsMessage({ action: 'save', settings: { ...saved.settings, debugEnab
 await job('translate', segments);
 assert.equal(calls, 2, 'Enabling debug or editing selection prompts must not invalidate paid guide caches');
 const malformed = [{ kind: 'prose', texts: ['Use Abyssal Lich for 25% damage.', 'Stay safe.'], protected: [] }];
-incompleteResponse = true;
-await assert.rejects(job('translate', malformed), /未返回有效译文[\s\S]*繁中[\s\S]*调试记录/);
+incompleteResponsesRemaining = 1;
+assert.equal((await job('translate', malformed)).completed, 0);
+assert.equal(lastJobMessages.at(-1).type, 'partial');
+assert.match(lastJobMessages.at(-1).firstError, /未返回有效译文[\s\S]*繁中[\s\S]*调试记录/);
 assert.equal(calls, 3, 'Failed validation must not trigger an automatic retry');
+assert.equal(lastJobMessages.findLast(message => message.type === 'guide-cost').summary.requests, 2, 'Malformed paid output must be recorded');
 async function readDebug() {
   const db = await new Promise((resolve, reject) => { const r = indexedDB.open('poe2ultra-translation-debug', 1); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
   return new Promise((resolve, reject) => { const tx = db.transaction('batches'); const r = tx.objectStore('batches').getAll(); tx.oncomplete = () => { resolve(r.result); db.close(); }; tx.onabort = () => reject(tx.error); });
@@ -153,4 +199,16 @@ assert.equal(traces[0].error.details.locale, 'tw');
 assert.ok(!JSON.stringify(traces).includes('test-placeholder'));
 assert.ok(!JSON.stringify(debugConsole).includes('test-placeholder'));
 assert.equal((await job('inspect', malformed)).completed, 0);
-console.log('Production bundle passed: guide and selection translation, persistent cache, whole-block translation and missing-output diagnostics, full debug request/HTTP/model output, failure diagnostics, credential redaction, worker restart and debug cache compatibility.');
+await settingsMessage({ action: 'save', settings: { ...saved.settings, debugEnabled: false } });
+const longSegments = ['A', 'B'].map(letter => ({ kind: 'prose', texts: [`Use Abyssal Lich for 25% damage. ${letter.repeat(3350)}`], protected: [] }));
+incompleteResponsesRemaining = 1;
+const partial = await job('translate', longSegments);
+assert.equal(partial.completed, 1, 'The later batch must complete when the first response is malformed and Debug is off');
+assert.equal(lastJobMessages.at(-1).type, 'partial');
+assert.equal(lastJobMessages.findLast(message => message.type === 'cost').requests, 2);
+assert.equal(lastJobMessages.findLast(message => message.type === 'cost').priced, 2);
+const retried = await job('translate', longSegments);
+assert.equal(retried.completed, 2, 'Retry must fill only the failed batch');
+assert.equal(retried.cached, 1);
+assert.equal(lastJobMessages.findLast(message => message.type === 'cost').requests, 1);
+console.log('Production bundle passed: guide and selection translation, cumulative CSV, durable per-guide cost receipts and backup, Debug-independent batch failure recovery, persistent cache, debug diagnostics and credential redaction.');

@@ -10,6 +10,7 @@ import { buildBody as buildResponsesBody } from '../../lib/translation/vendor/re
 import { compactRows, parseGlossaryText } from '../../lib/translation/vendor/glossary.js';
 import { PRICE_TABLE, resolveRates } from '../../lib/translation/vendor/pricing.js';
 import { initDebugPanel } from './debug.js';
+import { CACHE_BACKUP_MAX_BYTES, validateCacheBackup } from '../../lib/translation/cache-backup';
 
 const $ = (id) => document.getElementById(id);
 
@@ -678,9 +679,78 @@ async function init() {
   }
 
   $('btn-guide-cache-clear').addEventListener('click', async () => {
-    if (!confirm('确定清空所有攻略的简中、繁中缓存？重新翻译将再次调用 API。')) return;
+    if (!confirm('确定清空所有攻略的简中、繁中缓存？重新翻译将再次调用 API。已记录的费用估算会保留。')) return;
     try { await optionsRequest({ type: 'translation-settings', action: 'clear' }, true); await refreshGuideCache(); toast('攻略翻译缓存已清空', 'ok'); }
     catch (error) { toast(error.message, 'bad'); }
+  });
+  let pendingBackup = null;
+  $('btn-guide-cache-export').addEventListener('click', async () => {
+    const button = $('btn-guide-cache-export');
+    button.disabled = true;
+    try {
+      if (saving || (isDirtyForm() && !await save({ auto: true }))) throw new Error('请先保存当前设置，再导出缓存。');
+      const { backup } = await optionsRequest({ type: 'translation-cache', action: 'export' }, true);
+      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      if (blob.size > CACHE_BACKUP_MAX_BYTES) throw new Error('备份超过 50 MB，当前版本无法安全导入。');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = `poe2ultra-cache-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.append(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast(`已导出 ${backup.records.length.toLocaleString('zh-CN')} 条译文缓存和 ${(backup.guideCosts?.length ?? 0).toLocaleString('zh-CN')} 条费用记录`, 'ok');
+    } catch (error) { toast(`导出失败：${error.message || error}`, 'bad'); }
+    finally { button.disabled = false; }
+  });
+  $('btn-translations-csv-export').addEventListener('click', async () => {
+    const button = $('btn-translations-csv-export');
+    button.disabled = true;
+    try {
+      const { csv, count, unavailable } = await optionsRequest({ type: 'translation-cache', action: 'export-csv' }, true);
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = `poe2ultra-translations-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.append(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const missing = unavailable ? `；另有 ${unavailable.toLocaleString('zh-CN')} 条旧缓存需重新打开相应攻略补记原文` : '';
+      toast(`已导出 ${count.toLocaleString('zh-CN')} 条累计译文${missing}`, 'ok');
+    } catch (error) { toast(`CSV 导出失败：${error.message || error}`, 'bad'); }
+    finally { button.disabled = false; }
+  });
+  $('btn-guide-cache-import').addEventListener('click', () => $('guide-cache-file').click());
+  $('guide-cache-file').addEventListener('change', async event => {
+    pendingBackup = null;
+    $('btn-guide-cache-import-confirm').hidden = true;
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > CACHE_BACKUP_MAX_BYTES) throw new Error('备份超过 50 MB。');
+      pendingBackup = validateCacheBackup(JSON.parse(await file.text()));
+      $('guide-cache-import-preview').textContent = `${file.name}：${pendingBackup.records.length.toLocaleString('zh-CN')} 条双语译文、${(pendingBackup.guideCosts?.length ?? 0).toLocaleString('zh-CN')} 条费用记录。导入后合并现有缓存，并恢复匹配参数与术语表；当前 API Key 保留。`;
+      $('guide-cache-import-preview').hidden = false;
+      $('btn-guide-cache-import-confirm').hidden = false;
+    } catch (error) {
+      $('guide-cache-import-preview').textContent = `无法导入：${error.message || error}`;
+      $('guide-cache-import-preview').hidden = false;
+    } finally { event.target.value = ''; }
+  });
+  $('btn-guide-cache-import-confirm').addEventListener('click', async () => {
+    if (!pendingBackup) return;
+    const button = $('btn-guide-cache-import-confirm');
+    button.disabled = true;
+    try {
+      window.clearTimeout(autoSaveTimer); autoSaveTimer = 0;
+      if (saving) throw new Error('设置正在保存，请稍后重试。');
+      const result = await optionsRequest({ type: 'translation-cache', action: 'import', backup: pendingBackup }, true);
+      fillForm(result.settings);
+      lastSavedSnapshot = JSON.stringify(collectForm());
+      setSaveState('已恢复备份中的翻译参数', 'ok');
+      pendingBackup = null;
+      button.hidden = true;
+      $('guide-cache-import-preview').textContent = `已恢复：新增 ${result.imported.added.toLocaleString('zh-CN')} 条译文、${result.importedCosts.added.toLocaleString('zh-CN')} 条费用记录；保留现有译文 ${result.imported.kept.toLocaleString('zh-CN')} 条。刷新攻略页面即可使用。`;
+      await refreshGuideCache();
+      toast('译文缓存导入完成', 'ok');
+    } catch (error) { toast(`导入失败：${error.message || error}`, 'bad'); }
+    finally { button.disabled = false; }
   });
 
   $('btn-save').addEventListener('click', () => save());

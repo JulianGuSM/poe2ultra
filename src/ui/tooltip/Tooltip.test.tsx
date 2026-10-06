@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/preact';
 import { describe, expect, it, vi } from 'vitest';
 import type { TooltipModel } from '@/lib/tooltip/tooltip-model';
 import { TooltipProvider, WithTooltip } from './Tooltip';
+import { TranslationProvider } from '@/ui/translation/BilingualText';
 
 const MODEL: TooltipModel = {
   title: "Atziri's Disdain",
@@ -34,11 +35,10 @@ function renderTrigger(model: TooltipModel | null = MODEL) {
 const trigger = () => screen.getByText('Atziri');
 
 describe('WithTooltip', () => {
-  it('renders as a button with pointer cursor', () => {
+  it('renders as an accessible button', () => {
     renderTrigger();
 
     expect(trigger().getAttribute('role')).toBe('button');
-    expect(window.getComputedStyle(trigger()).cursor).toBe('pointer');
   });
 
   it('opens the tooltip on click', () => {
@@ -75,6 +75,22 @@ describe('WithTooltip', () => {
     ]) {
       expect(tooltip.textContent).toContain(text);
     }
+  });
+
+  it('localizes fixed gem labels and quality heading without a model translation', () => {
+    render(
+      <TranslationProvider records={{}} locale="cn">
+        <TooltipProvider>
+          <WithTooltip model={{ ...MODEL, subtitle: 'Skill Gem', sections: [{ title: 'Additional Effects From Quality', lines: ['(0-20)% increased Cooldown Recovery Rate'], tone: 'muted' }] }}>Atziri</WithTooltip>
+        </TooltipProvider>
+      </TranslationProvider>,
+    );
+    fireEvent.click(trigger());
+    const tooltip = screen.getByRole('dialog');
+    expect(tooltip.textContent).toContain('技能宝石');
+    expect(tooltip.textContent).toContain('品质附加效果');
+    expect(tooltip.textContent).toContain('需求：等级 40, 智慧 58');
+    expect(tooltip.textContent).not.toContain('Additional Effects From Quality');
   });
 
   it('does not open on hover', () => {

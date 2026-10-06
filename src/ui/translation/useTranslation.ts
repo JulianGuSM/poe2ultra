@@ -5,8 +5,10 @@ import { planTranslation, segmentKey, type Locale, type Records } from '@/lib/tr
 import type { Progress } from '@/lib/translation/engine';
 import { SETTINGS_KEY } from '@/lib/translation/settings';
 import type { Activity } from '@/lib/translation/activity';
+import type { GuideCostSummary } from '@/lib/translation/cache';
 
 const LOCALE_KEY = 'poe2ultra.translation.locale';
+interface CostStatus { text: string; requests: number; priced: number }
 export function useTranslation(source: Build) {
   const plan = useMemo(() => planTranslation(source), [source]);
   const [locale, setLocale] = useState<Locale>('en');
@@ -16,6 +18,9 @@ export function useTranslation(source: Build) {
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [cost, setCost] = useState<CostStatus | null>(null);
+  const [guideCost, setGuideCost] = useState<GuideCostSummary | null>(null);
+  const [attempted, setAttempted] = useState(false);
   const [timing, setTiming] = useState({ elapsed: 0, stageElapsed: 0 });
   const started = useRef(0), stageStarted = useRef(0), stageKey = useRef('');
   const send = useRef<(type: string) => void>(() => {});
@@ -34,7 +39,7 @@ export function useTranslation(source: Build) {
     let refreshAfterRun = false;
     setState({ records: {}, total: plan.segments.length, completed: 0, cached: 0 });
     setError(''); setWarning(''); setBusy(false); setChecking(true);
-    setActivity(null); setTiming({ elapsed: 0, stageElapsed: 0 });
+    setActivity(null); setTiming({ elapsed: 0, stageElapsed: 0 }); setCost(null); setGuideCost(null); setAttempted(false);
     const connect = () => {
       if (port) return port;
       const next = browser.runtime.connect({ name: 'poe2ultra-translation' });
@@ -51,9 +56,13 @@ export function useTranslation(source: Build) {
           setActivity(message);
         }
         if (message.type === 'warning') setWarning(message.text);
-        if (['done', 'error', 'cancelled'].includes(message.type)) {
+        if (message.type === 'cost') setCost({ text: message.text, requests: message.requests, priced: message.priced });
+        if (message.type === 'guide-cost') setGuideCost(message.summary);
+        if (message.type === 'batch-error') setWarning(`第 ${message.batch} / ${message.batches} 批输出无效，正在继续处理后续批次。`);
+        if (['done', 'partial', 'error', 'cancelled'].includes(message.type)) {
           setBusy(false); setChecking(false); running = false; inspecting = false;
           if (message.type === 'error') setError(message.text);
+          if (message.type === 'partial') setWarning(`本轮有 ${message.failedBatches} 批模型输出未通过检查，后续批次已继续处理。点击“继续翻译剩余内容”重试未缓存内容。\n首个错误：${message.firstError}`);
           if (message.type === 'cancelled') setWarning('已停止翻译。完成的批次已缓存，可以继续翻译剩余内容。');
           if (refreshAfterRun) { refreshAfterRun = false; queueMicrotask(() => { if (!disposed) post('inspect'); }); }
         }
@@ -70,7 +79,7 @@ export function useTranslation(source: Build) {
       try {
         if (type === 'translate') {
           if (running) return;
-          setError(''); setWarning(''); running = true; setBusy(true);
+          setError(''); setWarning(''); setCost(null); setAttempted(true); running = true; setBusy(true);
           started.current = stageStarted.current = Date.now(); stageKey.current = '0:checking';
           setActivity({ stage: 'checking' }); setTiming({ elapsed: 0, stageElapsed: 0 });
         }
@@ -105,7 +114,7 @@ export function useTranslation(source: Build) {
   };
   const build = source;
   const missingChars = plan.segments.filter(s => !state.records[segmentKey(s)]).reduce((sum, s) => sum + s.texts.join('').length, 0);
-  return { build, locale, choose, state, busy, checking, error, warning, missingChars, activity, timing,
+  return { build, locale, choose, state, busy, checking, error, warning, missingChars, activity, timing, cost, guideCost, attempted,
     translate: () => { if (locale === 'en') choose('cn'); send.current('translate'); },
     stop: () => send.current('cancel'), settings: () => send.current('options') };
 }

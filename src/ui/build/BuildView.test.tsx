@@ -80,6 +80,8 @@ describe('BuildView header', () => {
 
     expect(container.querySelector('header')).toBeNull();
     expect(container.querySelector('.tab-bar__title')?.textContent).toBe(BUILD.title);
+    expect(container.querySelector('.tab-bar__title')?.getAttribute('title')).toBe(BUILD.title);
+    expect(container.querySelector('.tab-bar__title .bilingual-text')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show original page' }));
     expect(onOriginal).toHaveBeenCalledOnce();

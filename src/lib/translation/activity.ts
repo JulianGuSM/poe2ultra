@@ -4,5 +4,7 @@ export interface Activity {
   batch?: number;
   batches?: number;
   receivedChars?: number;
+  modelRequest?: boolean;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number; prompt_cache_miss_tokens?: number; total_tokens?: number } | null;
 }
 export type ReportActivity = (activity: Activity) => void;

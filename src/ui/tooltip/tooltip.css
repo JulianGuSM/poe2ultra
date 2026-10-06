@@ -177,13 +177,18 @@
 /* What the base item gives, above the rolled modifiers; the next section's own line sets it apart. */
 .tooltip__section--implicit li {
   color: var(--rarity-magic);
-  opacity: 0.75;
 }
 
 .tooltip__flavour {
   color: var(--rarity-unique);
   font-style: italic;
-  opacity: 0.8;
+}
+
+/* Cached Chinese remains visually secondary to game text, but legible in the dark pinned card. */
+.tooltip .translation-text {
+  color: #d9dde5;
+  font-weight: 500;
+  font-style: normal;
 }
 
 .tooltip__corrupted {

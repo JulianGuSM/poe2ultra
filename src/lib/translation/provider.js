@@ -8,6 +8,8 @@ import { collectContext } from './context.js';
 import { parseBatch } from './protocol';
 import { buildGuidePrompt } from './guide-prompt.js';
 
+const skippableOutputError = error => Object.assign(error, { recoverableBatch: true });
+
 export { defaultSettings } from './settings';
 
 export async function translateBatch(batch, configured, signal, report = () => {}, suppliedGlossary, debug) {
@@ -69,14 +71,17 @@ export async function translateBatch(batch, configured, signal, report = () => {
     onReasoning: chunk => { debug?.chunk('reasoning', chunk); streamActivity('reasoning'); },
   });
   await debug?.data('response', response);
-  report({ stage: 'validating', receivedChars: response.text.length });
+  // Report provider usage before validating the text: malformed output may still be billed.
+  report({ stage: 'validating', receivedChars: response.text.length, modelRequest: true, usage: response.usage ?? null });
   if (response.finishReason !== 'stop') {
     const detail = response.finishReason === 'length'
       ? '已达到输出 token 上限，请在翻译设置中调高“最大输出 token”或关闭思考模式。'
       : `结束原因：${response.finishReason || '未收到完成标记'}。请检查接口是否返回了完整响应。`;
-    throw new Error(`模型未完整返回两套译文，本批未缓存。${detail}之前已保存的译文仍保留。`);
+    throw skippableOutputError(new Error(`模型未完整返回两套译文，本批未缓存。${detail}之前已保存的译文仍保留。`));
   }
-  const parsed = parseBatch(response.text, missing);
+  let parsed;
+  try { parsed = parseBatch(response.text, missing); }
+  catch (error) { throw skippableOutputError(error); }
   parsed.forEach((translation, i) => {
     result[positions[i]] = translation;
   });

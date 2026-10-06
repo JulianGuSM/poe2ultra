@@ -46,7 +46,7 @@ describe('existing translator integration', () => {
   });
   it('does not cache a response cut off by the provider', async () => {
     mocks.translate.mockResolvedValue({ text: '{}', finishReason: 'length' });
-    await expect(translateBatch([prose], settings, signal())).rejects.toThrow('已达到输出 token 上限');
+    await expect(translateBatch([prose], settings, signal())).rejects.toMatchObject({ recoverableBatch: true, message: expect.stringContaining('已达到输出 token 上限') });
     expect(mocks.translate).toHaveBeenCalledTimes(1);
   });
   it.each(['chat', 'responses'] as const)('reports real %s activity before a batch completes and sends original complete blocks without markers', async apiMode => {
@@ -80,9 +80,12 @@ describe('existing translator integration', () => {
     expect(request.prompt.systemText).toBe(GUIDE_SYSTEM_PROMPT);
   });
   it('reports malformed output once without automatically charging for a retry', async () => {
-    mocks.translate.mockResolvedValue({ text: '{"translations":', finishReason: 'stop' });
-    await expect(translateBatch([prose], settings, signal())).rejects.toThrow(/没有完整闭合[\s\S]*返回开头/);
+    const activity = vi.fn();
+    mocks.translate.mockResolvedValue({ text: '{"translations":', finishReason: 'stop', usage: { prompt_tokens: 100, completion_tokens: 20 } });
+    await expect(translateBatch([prose], settings, signal(), activity)).rejects.toMatchObject({ recoverableBatch: true });
     expect(mocks.translate).toHaveBeenCalledTimes(1);
+    expect(activity).toHaveBeenCalledWith(expect.objectContaining({ stage: 'validating', modelRequest: true,
+      usage: { prompt_tokens: 100, completion_tokens: 20 } }));
   });
   it('ignores selection prompts for guide requests without changing saved settings', async () => {
     mocks.translate.mockResolvedValue({ text: '{"translations":[{"id":0,"cn":["译文"],"tw":["譯文"]}]}', finishReason: 'stop' });

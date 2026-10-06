@@ -1,4 +1,4 @@
-import { BilingualText, TranslationContext } from '@/ui/translation/BilingualText';
+import { BilingualText, TranslationContext, TranslationText } from '@/ui/translation/BilingualText';
 import { Flag, Tag, User } from 'lucide-preact';
 import { useContext, useMemo } from 'preact/hooks';
 import type { Build } from '@/lib/build/model';
@@ -15,7 +15,10 @@ export function BuildHeader({ build }: { build: Build }) {
     <header class={`build-header${summary ? '' : ' build-header--no-summary'}`}>
       <Icon src={build.headerImageUrl} class="build-header__art" missing="none" />
       <div class="build-header__identity">
-        <h1 class="build-header__title"><BilingualText text={build.title} /></h1>
+        <h1 class="build-header__title">
+          <span class="build-header__title-original">{build.title}</span>
+          <TranslationText source={build.title} />
+        </h1>
         {(build.className || build.ascendancy) && (
           <p class="build-header__hero">
             {build.className && <span><BilingualText text={build.className} /></span>}

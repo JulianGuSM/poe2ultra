@@ -1,23 +1,41 @@
-.translation { flex: none; min-width: 0; padding: 9px 24px; border-bottom: 1px solid var(--border); font-size: 12px; }
-.translation__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
-.translation button { background: transparent; border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; color: var(--text-muted); cursor: pointer; font: inherit; }
+.translation { position: relative; display: flex; flex: none; align-items: center; gap: 9px; margin-right: 10px; padding-right: 15px; border-right: 1px solid var(--border); font-size: 12px; }
+.translation button { background: transparent; border: 1px solid var(--border); border-radius: 5px; padding: 6px 9px; color: var(--text-muted); cursor: pointer; font: inherit; }
 .translation button:hover { color: var(--text); background: var(--surface-hover); }
 .translation button:disabled { opacity: .5; cursor: default; }
-.translation button[aria-pressed=true] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.translation button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.translation .translation__ring-button { display: grid; flex: none; place-items: center; width: 38px; height: 38px; padding: 2px; border: 0; border-radius: 50%; }
+.translation__ring { width: 34px; height: 34px; overflow: visible; }
+.translation__ring-track, .translation__ring-value { fill: none; stroke-width: 3; }
+.translation__ring-track { stroke: var(--border); }
+.translation__ring-value { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .25s ease; }
+.translation--attention .translation__ring-value { stroke: var(--gem-str); }
+.translation__ring text { fill: var(--text); font: 600 9px var(--font); }
+.translation__languages { display: inline-flex; flex: none; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+.translation .translation__languages button { min-width: 40px; padding: 5px 8px; border: 0; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+.translation .translation__languages button[aria-pressed=true] { color: var(--accent-strong); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.translation__details { position: absolute; z-index: 20; top: calc(100% + 10px); right: -76px; box-sizing: border-box; width: 370px; max-width: calc(100vw - 24px); max-height: min(70vh, 520px); overflow: auto; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); box-shadow: 0 16px 40px rgba(0,0,0,.55); color: var(--text); line-height: 1.5; white-space: normal; }
+.translation__details-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 14px; }
+.translation .translation__close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; }
+.translation__summary { margin: 0; color: var(--text-muted); }
+.translation__summary strong { color: var(--text); font-weight: 600; }
+.translation__cost { margin: 10px 0 14px; color: #d9dde5; }
+.translation__run-cost { margin: 10px 0 0; color: var(--text-muted); }
+.translation__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .translation button.translation__start:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
 .translation button.translation__start:not(:disabled):hover { background: var(--accent-strong); }
-.translation button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.translation__languages { display: flex; gap: 3px; flex: none; }
-.translation__status { color: var(--text-muted); margin: 6px 0 0; overflow-wrap: anywhere; }
-.translation__hint { color: var(--text-muted); margin: 3px 0 0; overflow-wrap: anywhere; }
-.translation__message { margin: 6px 0 0; color: var(--accent); overflow-wrap: anywhere; white-space: pre-line; }
-.translation__progress { margin-top: 7px; height: 5px; border-radius: 4px; background: var(--border); overflow: hidden; }
-.translation__progress > span { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
-.translation__activity { margin-top: 6px; color: var(--text-muted); overflow-wrap: anywhere; }
-.translation__activity p { margin: 3px 0 0; }
+.translation__status { color: var(--text-muted); margin: 10px 0 0; overflow-wrap: anywhere; }
+.translation__hint { color: var(--text-muted); margin: 6px 0 0; overflow-wrap: anywhere; }
+.translation__message { margin: 10px 0 0; color: var(--accent); overflow-wrap: anywhere; white-space: pre-line; }
+.translation__activity { margin-top: 10px; color: var(--text-muted); overflow-wrap: anywhere; }
+.translation__activity p { margin: 4px 0 0; }
 .translation__pulse { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--accent); animation: translation-pulse 1.5s ease-in-out infinite; }
 @keyframes translation-pulse { 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .translation__pulse { animation: none; } .translation__progress > span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .translation__pulse { animation: none; } .translation__ring-value { transition: none; } }
+@media (max-width: 420px) {
+  .tab-bar .translation { gap: 5px; margin-right: 4px; padding-right: 7px; }
+  .tab-bar .translation__languages button { min-width: 34px; padding: 5px 6px; }
+  .tab-bar .translation__details { right: -68px; }
+}
 .translation-text {
   display: block;
   margin: 0.35em 0 0.8em;

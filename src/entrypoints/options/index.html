@@ -33,7 +33,17 @@
       <p class="desc">攻略页面点击“开始翻译”后，固定生成简中、繁中两套独立译文并长期缓存。下方“目标语言”和“双版本输出”仅控制划词翻译；面板外观和费用设置不会使攻略缓存失效。</p>
       <p class="hint">设置会自动保存在本机，不同步到 Google 账号。修改模型、术语表或翻译参数后，使用对应的新缓存；恢复原配置仍可复用旧缓存。划词提示词独立生效，不影响全文翻译及其缓存。导入术语表时，正在运行的攻略任务使用启动时的术语表，下一次任务使用新表。</p>
       <p id="guide-cache-state" class="hint">正在读取攻略缓存…</p>
-      <button id="btn-guide-cache-clear" class="btn danger" type="button">清空攻略翻译缓存</button>
+      <p class="hint">卸载扩展前请导出备份。备份包含简中、繁中译文、攻略费用估算记录、匹配缓存所需的翻译参数及导入术语表；不会自动加入 API Key 或额外请求头。自定义请求体会随翻译参数导出，请妥善保存备份。导入时保留现有译文与费用记录，并恢复备份中的翻译参数。</p>
+      <div class="card-actions">
+        <button id="btn-guide-cache-export" class="btn" type="button">导出译文缓存（JSON）</button>
+        <button id="btn-translations-csv-export" class="btn" type="button">导出累计译文（CSV）</button>
+        <button id="btn-guide-cache-import" class="btn" type="button">选择缓存备份</button>
+        <input id="guide-cache-file" type="file" accept=".json,application/json" hidden />
+        <button id="btn-guide-cache-clear" class="btn danger" type="button">清空攻略译文（保留费用记录）</button>
+      </div>
+      <p class="hint">CSV 汇总攻略全文翻译和已完成的双语划词翻译，仅包含英语原文、简中、繁中三列。每次导出会下载当前本机累计记录的完整快照；CSV 用于阅读和整理，重装后恢复缓存请用 JSON 备份。旧版攻略缓存会在重新打开对应攻略时补记原文，无需重新调用 API。</p>
+      <p id="guide-cache-import-preview" class="hint" role="status" hidden></p>
+      <button id="btn-guide-cache-import-confirm" class="btn primary" type="button" hidden>合并并恢复翻译参数</button>
     </section>
     <!-- 1. 接口 -->
     <section class="card">
@@ -387,7 +397,7 @@
       <div class="card-head">
         <h2>5 · 费用估算</h2>
         <p class="desc">
-          划词翻译完成后，结果面板底部会显示本次消耗金额（人民币估算值）。
+          划词翻译完成后在结果面板、攻略全文翻译结束后在攻略状态栏显示本次消耗金额（人民币估算值）。
           沿用原插件内置价目表（不会自动更新），可在 <a id="price-link" href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing" target="_blank" rel="noreferrer">DeepSeek 官方价目表</a> 核对后填写自定义单价，
           仅作估算，实际扣费以平台账单为准。
         </p>
@@ -395,7 +405,7 @@
 
       <label class="switch">
         <input id="showCost" type="checkbox" />
-        <span>在结果面板显示本次消耗金额</span>
+        <span>显示划词及攻略全文翻译的本次费用估算</span>
       </label>
       <label class="switch">
         <input id="costAutoPeak" type="checkbox" />

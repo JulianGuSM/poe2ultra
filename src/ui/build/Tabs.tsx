@@ -1,6 +1,8 @@
 import { FlaskConical, Info, type LucideIcon, MapIcon, Network, Shirt, Sparkles } from 'lucide-preact';
 import { useRef } from 'preact/hooks';
 import { TABS, type TabId } from '@/lib/ui/route';
+import { uiText } from '@/lib/ui/i18n';
+import { useDisplayLocale } from '@/ui/translation/BilingualText';
 
 type Tab = (typeof TABS)[number];
 
@@ -19,6 +21,7 @@ export const panelElementId = (tab: TabId) => `panel-${tab}`;
 /** WAI-ARIA tabs: one tab stop, arrow keys move the selection. */
 export function Tabs({ tabs = TABS, selected, onSelect }: { tabs?: readonly Tab[]; selected: TabId; onSelect: (tab: TabId) => void }) {
   const refs = useRef(new Map<TabId, HTMLButtonElement>());
+  const locale = useDisplayLocale();
 
   const onKeyDown = (event: KeyboardEvent) => {
     const index = tabs.findIndex((tab) => tab.id === selected);
@@ -31,7 +34,7 @@ export function Tabs({ tabs = TABS, selected, onSelect }: { tabs?: readonly Tab[
   };
 
   return (
-    <div class="tabs" role="tablist" aria-label="Build sections">
+    <div class="tabs" role="tablist" aria-label={uiText('Build sections', locale)}>
       {tabs.map(({ id, label }) => {
         const Icon = ICONS[id];
         const isSelected = id === selected;
@@ -52,7 +55,7 @@ export function Tabs({ tabs = TABS, selected, onSelect }: { tabs?: readonly Tab[
             onKeyDown={onKeyDown}
           >
             <Icon size={16} aria-hidden="true" />
-            <span>{label}</span>
+            <span>{uiText(label, locale)}</span>
           </button>
         );
       })}

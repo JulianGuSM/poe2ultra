@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TranslationEngine, type TranslationStore } from './engine';
-import type { Segment, Translation } from './plan';
+import type { CachedTranslation, Segment, Translation } from './plan';
 import { parseBatch } from './protocol';
 
 const a: Segment = { kind: 'prose', texts: ['Use a skill.'], protected: [] };
 const b: Segment = { kind: 'prose', texts: ['Use another skill.'], protected: [] };
 const result: Translation = { cn: ['使用技能。'], tw: ['使用技能。'] };
 function setup(translate = vi.fn(async (_batch: Segment[]) => [result])) {
-  const saved = new Map<string, Translation>();
+  const saved = new Map<string, CachedTranslation>();
   const store: TranslationStore = { get: async key => saved.get(key), put: async (key, value) => { saved.set(key, value); } };
   return { saved, store, translate, engine: new TranslationEngine(store, translate) };
 }
@@ -22,12 +22,25 @@ describe('persistent dual translation cache', () => {
     expect((await reopened.inspect([paragraph], 'profile')).completed).toBe(1);
   });
   it('reuses both locales after reopening and across guides without another API request', async () => {
-    const { engine, store, translate } = setup();
+    const { engine, store, translate, saved } = setup();
     await engine.run([a, a], 'profile', new AbortController().signal, () => {});
     const reopened = new TranslationEngine(store, translate);
     await reopened.run([a], 'profile', new AbortController().signal, () => {});
     expect(translate).toHaveBeenCalledTimes(1);
     expect(Object.values((await reopened.inspect([a], 'profile')).records)[0]).toEqual(result);
+    expect([...saved.values()][0]).toEqual({ ...result, source: a.texts.join('') });
+  });
+  it('fills in the English source of an older cached translation without another provider call', async () => {
+    const { engine, saved, store, translate } = setup();
+    const key = await (engine as any).key(a, 'profile');
+    saved.set(key, result);
+    store.annotate = vi.fn(async (storedKey, source) => {
+      saved.set(storedKey, { ...saved.get(storedKey)!, source });
+    });
+    expect((await engine.inspect([a], 'profile')).cached).toBe(1);
+    expect(saved.get(key)).toEqual({ ...result, source: a.texts.join('') });
+    expect(store.annotate).toHaveBeenCalledOnce();
+    expect(translate).not.toHaveBeenCalled();
   });
   it('keeps completed batches after a failure and resumes only missing content', async () => {
     const { engine, translate, saved } = setup();
@@ -40,6 +53,30 @@ describe('persistent dual translation cache', () => {
     expect(saved.size).toBe(1);
     await engine.run([a, b], 'profile', new AbortController().signal, () => {});
     expect(translate.mock.calls.at(-1)?.[0]).toEqual([b]);
+  });
+  it('skips one malformed model batch without Debug, translates later batches and retries only the missing one', async () => {
+    const first: Segment = { kind: 'prose', texts: ['A'.repeat(3400)], protected: [] };
+    const later: Segment = { kind: 'prose', texts: ['B'.repeat(3400)], protected: [] };
+    const { engine, translate } = setup();
+    const failed = vi.fn();
+    translate.mockRejectedValueOnce(Object.assign(new Error('模型返回的 JSON 格式无效'), { recoverableBatch: true }));
+    const summary = await engine.run([first, later], 'p', new AbortController().signal, () => {}, () => {}, undefined, failed);
+    expect(summary.failedBatches).toBe(1);
+    expect(failed).toHaveBeenCalledWith(expect.objectContaining({ batch: 1, batches: 2 }));
+    expect((await engine.inspect([first, later], 'p')).completed).toBe(1);
+    expect(translate).toHaveBeenCalledTimes(2);
+    const retried = await engine.run([first, later], 'p', new AbortController().signal, () => {});
+    expect(retried.failedBatches).toBe(0);
+    expect(translate.mock.calls.at(-1)?.[0]).toEqual([first]);
+    expect((await engine.inspect([first, later], 'p')).completed).toBe(2);
+  });
+  it('pauses after three consecutive malformed batches to avoid an expensive error cascade', async () => {
+    const segments: Segment[] = ['A', 'B', 'C', 'D'].map(letter => ({ kind: 'prose', texts: [letter.repeat(3400)], protected: [] }));
+    const translate = vi.fn(async () => { throw Object.assign(new Error('bad JSON'), { recoverableBatch: true }); });
+    const { store } = setup();
+    const engine = new TranslationEngine(store, translate);
+    await expect(engine.run(segments, 'p', new AbortController().signal, () => {})).rejects.toThrow('连续 3 批');
+    expect(translate).toHaveBeenCalledTimes(3);
   });
   it('coalesces concurrent requests and separates changed prompt profiles', async () => {
     const { engine, translate } = setup();
