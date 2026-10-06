@@ -9,7 +9,6 @@ import type { TooltipModel } from '@/lib/tooltip/tooltip-model';
 import { Icon } from '@/ui/common/Icon';
 
 const TOOLTIP_ID = 'guide-tooltip';
-const HOVER_DELAY_MS = 150;
 
 interface TooltipApi {
   open(anchor: HTMLElement, model: TooltipModel): void;
@@ -58,13 +57,11 @@ export function TooltipProvider({ children, resetKey }: { children: ComponentChi
 export function WithTooltip({ model, children }: { model: TooltipModel | null; children: ComponentChildren }) {
   const api = useContext(TooltipContext);
   const ref = useRef<HTMLSpanElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
 
   const close = api?.close;
   useEffect(() => {
     const anchor = ref.current;
     return () => {
-      clearTimeout(timer.current);
       if (anchor) close?.(anchor);
     };
   }, [close]);
@@ -72,7 +69,6 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
   if (!model || !api) return <>{children}</>;
 
   const show = () => ref.current && !api.openAnchor && api.open(ref.current, model);
-  const cancelPending = () => clearTimeout(timer.current);
   const isOpen = api.openAnchor !== null && api.openAnchor === ref.current;
 
   return (
@@ -80,20 +76,31 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
       ref={ref}
       class="tooltip-trigger"
       tabIndex={0}
+      role="button"
       aria-haspopup="dialog"
       aria-expanded={isOpen}
       aria-controls={isOpen ? TOOLTIP_ID : undefined}
-      onPointerOver={(event) => {
+      onClick={(event) => {
         // Only the innermost trigger opens a new card; an already pinned card keeps ownership.
-        clearTimeout(timer.current);
         const owner = (event.target as Element).closest('.tooltip-trigger');
-        if (owner === ref.current && !api.openAnchor) timer.current = setTimeout(show, HOVER_DELAY_MS);
+        if (owner !== ref.current) return;
+        if (isOpen) {
+          api.close();
+        } else if (!api.openAnchor) {
+          show();
+        }
       }}
-      onPointerLeave={cancelPending}
-      onFocus={event => { if ((event.target as Element).closest('.tooltip-trigger') === ref.current) show(); }}
-      onBlur={cancelPending}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') { cancelPending(); api.close(); }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (isOpen) {
+            api.close();
+          } else if (!api.openAnchor) {
+            show();
+          }
+        } else if (event.key === 'Escape') {
+          api.close();
+        }
       }}
     >
       {children}

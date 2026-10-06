@@ -69,11 +69,11 @@ describe('OverviewPanel', () => {
   it('opens tooltips for what the glance card lists', () => {
     renderPanel();
 
-    fireEvent.focus(glance().querySelector('.glance__uniques .tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe("Atziri's Disdain");
+    fireEvent.click(glance().querySelector('.glance__uniques .tooltip-trigger')!);
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe("Atziri's Disdain");
 
-    fireEvent.focus(glance().querySelector('.glance__ascendancy .tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe('Soulless Form');
+    fireEvent.click(glance().querySelector('.glance__ascendancy .tooltip-trigger')!);
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Soulless Form');
   });
 
   it('links the video guide in a new tab', () => {
@@ -95,9 +95,9 @@ describe('OverviewPanel', () => {
     const { container } = renderPanel();
 
     const contagion = within(container.querySelector('.overview__texts') as HTMLElement).getAllByText('Contagion')[0]!.closest('.tooltip-trigger') as HTMLElement;
-    fireEvent.focus(contagion);
+    fireEvent.click(contagion);
 
-    expect(screen.getByRole('tooltip').textContent).toContain('Skill Gem');
+    expect(screen.getByRole('dialog').textContent).toContain('Skill Gem');
   });
 
   it('leaves entities without static data as plain chips', () => {

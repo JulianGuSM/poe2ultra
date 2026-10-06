@@ -1,6 +1,6 @@
 .tooltip-trigger {
   border-radius: 4px;
-  cursor: help;
+  cursor: pointer;
 }
 
 .tooltip-trigger:focus-visible {

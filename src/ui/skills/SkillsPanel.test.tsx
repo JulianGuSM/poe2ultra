@@ -88,8 +88,8 @@ describe('SkillsPanel', () => {
     const supports = row.querySelectorAll('.skill-row__support');
     expect(supports).toHaveLength(5);
 
-    fireEvent.focus(supports[0]!.closest('.tooltip-trigger')!);
-    const tooltip = screen.getByRole('tooltip');
+    fireEvent.click(supports[0]!.closest('.tooltip-trigger')!);
+    const tooltip = screen.getByRole('dialog');
     expect(tooltip.querySelector('.tooltip__title')?.textContent).toBe('Chain II');
     expect(tooltip.textContent).toContain('Support Gem');
   });
@@ -138,8 +138,8 @@ describe('SkillsPanel', () => {
     expect(rows[0]?.querySelector('.gem-priority__name')?.textContent).toBe('Chain II');
     expect(rows[0]?.querySelector('.gem-priority__parent')?.textContent).toBe('Essence Drain');
 
-    fireEvent.focus(rows[0]!.querySelector('.tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe('Chain II');
+    fireEvent.click(rows[0]!.querySelector('.tooltip-trigger')!);
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Chain II');
   });
 
   it('highlights the priority entries of the selected skill', () => {

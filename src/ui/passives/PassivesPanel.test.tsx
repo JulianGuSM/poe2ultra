@@ -86,7 +86,7 @@ describe('PassivesPanel', () => {
     fireEvent.pointerLeave(row);
     expect(treeFocus.clear).toHaveBeenCalled();
 
-    fireEvent.focusIn(row.querySelector('.tooltip-trigger')!);
+    fireEvent.focusIn(row);
     expect(treeFocus.highlight).toHaveBeenCalledTimes(2);
   });
 
@@ -107,9 +107,9 @@ describe('PassivesPanel', () => {
     renderPanel();
     showKeyPassives();
 
-    fireEvent.focus(within(keyList()).getByText('Pure Energy').closest('.tooltip-trigger')!);
+    fireEvent.click(within(keyList()).getByText('Pure Energy').closest('.tooltip-trigger')!);
 
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe('Pure Energy');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Pure Energy');
   });
 
   it('leaves out the ascendancy before the build has one', () => {
@@ -142,9 +142,9 @@ describe('PassivesPanel', () => {
     fireEvent.click(screen.getByRole('tab', { name: "Author's notes" }));
 
     const chip = within(screen.getByRole('tabpanel', { name: "Author's notes" })).getAllByText('Potent Incantation')[0]!.closest('.tooltip-trigger')!;
-    fireEvent.focus(chip);
+    fireEvent.click(chip);
 
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe('Potent Incantation');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Potent Incantation');
   });
 
   it('shows just the priority list when the author wrote no notes on the tree', () => {

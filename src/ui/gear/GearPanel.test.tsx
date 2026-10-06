@@ -107,14 +107,14 @@ describe('GearPanel', () => {
     expect(amulet.querySelectorAll('.item-slot__grants:not(.item-slot__grants--rest)')).toHaveLength(2);
     expect(within(amulet).getByText('+3 more')).toBeTruthy();
 
-    fireEvent.focus(amulet.closest('.tooltip-trigger')!);
+    fireEvent.click(amulet.closest('.tooltip-trigger')!);
     expect(screen.getByRole('dialog').textContent).toContain('Elemental Conflux');
   });
 
   it('opens the item tooltip from its slot card', () => {
     renderPanel();
 
-    fireEvent.focus(slotCard('Helmet').closest('.tooltip-trigger')!);
+    fireEvent.click(slotCard('Helmet').closest('.tooltip-trigger')!);
 
     const tooltip = screen.getByRole('dialog');
     expect(tooltip.textContent).toContain("Atziri's Disdain");
@@ -127,7 +127,7 @@ describe('GearPanel', () => {
     const weapon = slotCard('Weapon');
     expect(weapon.querySelector('.item-slot__grants')?.textContent).toBe('Chaos Bolt');
 
-    fireEvent.focus(weapon.querySelector('.item-slot__grants')!.closest('.tooltip-trigger')!);
+    fireEvent.click(weapon.querySelector('.item-slot__grants')!.closest('.tooltip-trigger')!);
     const tooltip = screen.getByRole('dialog');
     expect(tooltip.querySelector('.tooltip__title')?.textContent).toBe('Chaos Bolt');
     expect(tooltip.querySelector('.tooltip__subtitle')?.textContent).toBe('Skill Gem');
@@ -156,7 +156,7 @@ describe('GearPanel', () => {
   it("shows the base item's own modifier in the tooltip, above the rolled ones", () => {
     renderPanel(BUILD.variants[0]!);
 
-    fireEvent.focus(slotCard('Ring 2').closest('.tooltip-trigger')!);
+    fireEvent.click(slotCard('Ring 2').closest('.tooltip-trigger')!);
 
     const implicit = screen.getByRole('dialog').querySelector('.tooltip__section--implicit');
     expect(implicit?.textContent).toBe('+(7-13)% to Chaos Resistance');
@@ -165,7 +165,7 @@ describe('GearPanel', () => {
   it('opens a tooltip for a rune socketed in an item', () => {
     renderPanel();
 
-    fireEvent.focus(slotCard('Helmet').querySelector('.item-slot__socket')!.closest('.tooltip-trigger')!);
+    fireEvent.click(slotCard('Helmet').querySelector('.item-slot__socket')!.closest('.tooltip-trigger')!);
 
     const tooltip = screen.getByRole('dialog');
     expect(tooltip.querySelector('.tooltip__title')?.textContent).toBe('Idol of Egrin');
@@ -181,7 +181,7 @@ describe('GearPanel', () => {
     expect(rows[0]?.querySelector('.priority__number')?.textContent).toBe('1');
     expect(rows[1]?.querySelector('.priority__slot')?.textContent).toBe('Belt');
 
-    fireEvent.focus(rows[1]!.querySelector('.tooltip-trigger')!);
+    fireEvent.click(rows[1]!.querySelector('.tooltip-trigger')!);
     expect(screen.getByRole('dialog').textContent).toContain('Ingenuity');
   });
 

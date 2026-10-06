@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.6.0 — poe2ultra
+
+- Tooltips now open on click instead of hover, with keyboard Enter/Space toggle and Escape to close.
+
 ## 1.5.1 — poe2ultra
 
 - Separate full-guide and selection prompts into their own files; send the requested guide system text without appended selection, glossary or formatting rules.

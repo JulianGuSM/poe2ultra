@@ -43,9 +43,9 @@ describe('AtlasPanel', () => {
   it('opens a tooltip for an atlas passive', () => {
     renderPanel();
 
-    fireEvent.focus(within(screen.getByRole('list', { name: 'Expedition passives' })).getByText('Buried Ambition').closest('.tooltip-trigger')!);
+    fireEvent.click(within(screen.getByRole('list', { name: 'Expedition passives' })).getByText('Buried Ambition').closest('.tooltip-trigger')!);
 
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe('Buried Ambition');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Buried Ambition');
   });
 
   it("embeds the site's atlas tree for the variant", () => {
