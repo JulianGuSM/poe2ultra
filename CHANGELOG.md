@@ -1,0 +1,112 @@
+# Changelog
+
+## Unreleased
+
+## 1.5.0 — poe2ultra
+
+- Translate complete paragraphs as plain text, with no numeric markers or formatting-span alignment checks.
+- Keep original guide text and formatting; display cached Simplified/Traditional Chinese translations below each block in light grey.
+- Reuse previous span-based caches by joining their text, preserving paid work and debug logging.
+- Keep source English names for skill-copy actions and retain selection translation.
+
+## 1.4.2 — poe2ultra
+
+- Add opt-in full-guide Debug mode with persistent records for the most recent 500 batches, a Chinese batch viewer, JSON export and independent log clearing.
+- Record source segments, numeric protection and terminology context, the actual request body, decoded HTTP/SSE response, full model output, progress events, cache writes and failures. Redact credentials before storage and console output.
+- Report the failing locale/block and expected versus actual span count/type, with a debug record ID. Include explicit span counts in model input while retaining strict validation and no automatic retries.
+- Debug mode does not change translation cache keys or re-request cached text; logging storage failure does not interrupt translation.
+
+## 1.4.1 — poe2ultra
+
+- Add explicit POE2 localization expertise to every guide request, including existing saved prompts. Explain patch versions, stat units, regional terminology, and preservation of inline formatting boundaries.
+- Explain numeric marker failures precisely: identify the affected value and span, distinguish missing/changed, duplicate, relocated and split markers, and show the relevant excerpt with recognized markers restored for readability.
+- Retain strict validation and existing paid caches. Built-in domain guidance applies to missing translations without rewriting user settings or triggering automatic retries.
+
+## 1.4.0 — poe2ultra
+
+- Replace the basic options page with the Chinese configuration UI from Julian's poe2translator, including custom endpoints, request parameters, glossary import, diagnostics, prompts, panel preferences and cost estimates.
+- Restore selection translation on ordinary web pages and inside the guide: floating button, Alt+Q and context menu, streamed independent Chinese versions, copy, stop and retry.
+- Share settings and terminology between selection and full-guide translation. Preserve existing guide cache keys for unchanged settings; imported glossary snapshots and advanced translation parameters get separate cache profiles.
+- Enable API JSON output mode for full-guide requests in both API protocols. Accept one complete JSON object surrounded by prose or fences while retaining all content validation. Report empty output, malformed JSON and truncation distinctly, without automatic paid retries.
+- Update Chinese installation/use instructions and privacy documentation for the combined extension.
+
+## 1.3.2 — poe2ultra
+
+- Show saved progress as a percentage and bar, current batch and processing stage, streamed output character counts, and elapsed time.
+- Protect numeric literals with visible markers during model translation and restore original values before validation; reject missing, duplicated or changed markers.
+- Show Chinese validation errors with the failing locale and short source/translation excerpts. Keep existing cached translations and resume only missing work.
+
+## 1.3.1 — poe2ultra
+
+- Move the highlighted Start translation action next to the language switches instead of after the long counters.
+- Explain that language switches display saved translations, and show clear guidance when the cache is empty or incomplete.
+- Label cached blocks and remaining characters explicitly; use Chinese text for translation controls.
+- Existing translation caches and settings are unchanged.
+
+## 1.3.0
+
+### Firefox
+- poe2perfect is now a Firefox add-on as well, built from the same source as the Chrome extension: the same guide,
+  the same tabs, the same preferences. Firefox 140 or newer.
+- Loading a build could go on forever in Firefox, with the panel left on "Loading build…". The guide now gives the
+  page's own storage and the site a limited time to answer, and falls back to reading the build from the page.
+
+### Gear
+- An item that grants many skills (one amulet grants seven) no longer stretches the whole gear grid: the card shows
+  the first two and counts the rest, and the tooltip still lists them all.
+
+### Pictures
+- A picture the site does not give up — its CDN drops files now and then — leaves a stand-in shape instead of the
+  browser's broken-image mark: armour, a weapon, a shield, jewellery, a flask, a charm, a gem, a passive or a rune,
+  whichever belongs in that place. Names, modifiers and tooltips stay where they are.
+
+### Also
+- A new icon: a gothic medallion with the passive tree on it.
+
+## 1.2.0
+
+### Skills
+- Clicking a gem — in Active Skills, in Gem Priority or in the skill details — copies its name, ready to paste
+  into the game's own search. The panel says which name it took.
+- A long skill name in Gem Priority ends in an ellipsis instead of reaching into the next column.
+
+### Gear
+- Item tooltips now show what the base item gives on its own — the resistance of a ring, the spirit of an amulet,
+  the condition of a charm — above the rolled modifiers, as the game does. It was missing on every item that has one.
+
+### Where a build opens
+- A build opens again on the tab and at the act or stage you last read it at, remembered for each build on its own.
+  A build you open for the first time starts on Overview, whatever you were reading elsewhere.
+- When the author renames or rebuilds a variant, the guide finds the stage again by its name and otherwise opens
+  the author's default. A link that names a tab or variant still wins, so shared links open what they point at.
+
+### Loading
+- A first visit to mobalytics.gg could fail with an HTTP 403: the site's bot protection turns away a browser it
+  has not seen before. The guide now waits and asks again a few times, spends its last attempt on the visitor's
+  own session, and says on screen that it is still trying instead of showing an error straight away.
+
+## 1.1.0
+
+### Passives and Atlas Tree
+- The side panel is now called **Priority** and opens first: it shows the order in which to take the passives.
+- Ascendancy passives are numbered in the order to take them.
+- Point counts for the ascendancy and the atlas no longer include the free starting node, so they match the game.
+- Hovering a passive in the Priority list highlights it on the tree; clicking it centres the tree on that node.
+
+### Skills
+- Hovering a gem in **Gem Priority** highlights it in **Active Skills**, so you can see which skill it belongs to.
+
+### Gear
+- The belt now sits in the left column with the helmet, body armour, gloves and boots.
+- All three charm slots are always shown; empty ones appear as placeholders, so the layout stays the same across
+  build variants.
+- Every equipped item has a **trade** icon (scales) in the corner of its picture: it opens the official Path of
+  Exile trade site with a search for that item.
+
+### Overview
+- A collapsed **At a Glance** panel now expands when you click anywhere on it.
+
+## 1.0.0
+
+First public release: a clean tabbed view of PoE 2 build guides on mobalytics.gg — Overview, Skills, Gear, Passives,
+Atlas Tree and Progression.

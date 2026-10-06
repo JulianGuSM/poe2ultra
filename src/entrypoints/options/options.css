@@ -1,0 +1,243 @@
+:root {
+  --bg: #f4f5f9;
+  --card: #ffffff;
+  --fg: #1f2430;
+  --sub: #6b7280;
+  --line: #e3e6ee;
+  --soft: #f7f8fc;
+  --accent: #4d6bfe;
+  --accent-fg: #ffffff;
+  --danger: #d93025;
+  --ok: #17a673;
+  --shadow: 0 1px 2px rgba(17, 24, 39, .06), 0 8px 24px rgba(17, 24, 39, .05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161c;
+    --card: #1c1f27;
+    --fg: #e8eaf0;
+    --sub: #9aa3b2;
+    --line: #2e3340;
+    --soft: #22262f;
+    --accent: #7d92ff;
+    --accent-fg: #14161c;
+    --danger: #ff6b6b;
+    --ok: #3ddc97;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+.wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 64px; }
+
+code {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0 5px;
+  font-size: 12.5px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+a { color: var(--accent); }
+
+/* ---------------------------------------------------------------- 顶部 */
+
+/*
+ * 顶栏吸顶：设置项很多，改完下面几屏的配置不用再滚回顶部点「保存设置」，
+ * 「已保存 / 有未保存的更改」也一直看得见。
+ * 负 margin 抵消吸顶所需的 padding，保证不吸顶时的排版和以前一致。
+ */
+/* 1px 而不是 0：零高度元素的 IntersectionObserver 判定在部分实现里不稳定 */
+.top-sentinel { height: 1px; margin-top: -1px; }
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  margin: -14px 0 20px;
+  padding: 14px 0;
+  background: var(--bg);
+  border-bottom: 1px solid transparent;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+/* 滚过哨兵后：加一条分隔线和一点投影，别让下面的卡片看起来糊在标题上 */
+.top.stuck {
+  border-bottom-color: var(--line);
+  box-shadow: 0 8px 14px -12px rgba(17, 24, 39, .35);
+}
+@media (prefers-color-scheme: dark) {
+  .top.stuck { box-shadow: 0 8px 14px -12px rgba(0, 0, 0, .8); }
+}
+
+.top-left { display: flex; gap: 12px; align-items: center; }
+.top-left img { border-radius: 9px; }
+.top h1 { margin: 0; font-size: 20px; letter-spacing: .2px; }
+.sub { margin: 2px 0 0; color: var(--sub); font-size: 13px; }
+.top-right { display: flex; gap: 8px; align-items: center; }
+
+.save-state { font-size: 12px; color: var(--sub); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.save-state.ok { color: var(--ok); }
+.save-state.bad { color: var(--danger); }
+.save-state.pending { color: var(--sub); font-style: italic; }
+
+/* --------------------------------------------------------------- 卡片 */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.card-head { margin-bottom: 16px; }
+.card-head h2 { margin: 0 0 4px; font-size: 15px; }
+.desc { margin: 0; color: var(--sub); font-size: 12.5px; }
+
+/* --------------------------------------------------------------- 表单 */
+
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+.field > label, .label-row label {
+  display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px;
+}
+.label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.label-row label { margin: 0; }
+
+.row { display: flex; gap: 8px; align-items: center; }
+.grow { flex: 1 1 auto; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  width: 100%;
+  background: var(--soft);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font: inherit;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+textarea {
+  resize: vertical;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+  font-size: 12.8px;
+  line-height: 1.7;
+}
+
+.input-with-btn { position: relative; display: flex; }
+.input-with-btn input { padding-right: 64px; }
+.input-with-btn .btn.tiny {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+}
+
+.hint { margin: 6px 0 0; color: var(--sub); font-size: 12px; }
+.hint.ok { color: var(--ok); }
+.hint.bad { color: var(--danger); }
+
+.switch {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 0; cursor: pointer; font-size: 13.5px;
+}
+.switch input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+.adv { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.adv summary { cursor: pointer; color: var(--sub); font-size: 12.5px; margin-bottom: 12px; }
+
+.ws-block { margin-top: 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.warn-text {
+  border-left: 3px solid color-mix(in srgb, var(--danger) 55%, var(--line));
+  padding: 6px 10px; border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+.ws-block .adv { border-top: 0; padding-top: 0; margin-top: 10px; }
+
+/* --------------------------------------------------------------- 按钮 */
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--fg);
+  border-radius: 9px;
+  padding: 7px 14px;
+  font: inherit; font-size: 13px;
+  cursor: pointer;
+  transition: .15s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.primary:hover { color: var(--accent-fg); filter: brightness(1.07); }
+.btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+.btn.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); border-color: var(--danger); }
+.btn.tiny { padding: 3px 9px; font-size: 12px; border-radius: 7px; }
+.btn[disabled] { opacity: .55; cursor: default; }
+
+.card-actions { margin-top: 12px; display: flex; gap: 8px; }
+
+/* ----------------------------------------------------------- 占位符 */
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip {
+  border: 1px dashed var(--line);
+  background: var(--soft);
+  color: var(--sub);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-family: ui-monospace, Consolas, monospace;
+  cursor: pointer;
+}
+.chip:hover { color: var(--accent); border-color: var(--accent); border-style: solid; }
+
+.preview {
+  margin: 14px 0 0;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 380px;
+  overflow: auto;
+}
+
+/* --------------------------------------------------------------- 其他 */
+
+.bottom {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-top: 6px;
+}
+.foot-note { color: var(--sub); font-size: 12px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  background: var(--fg); color: var(--bg);
+  padding: 9px 16px; border-radius: 10px; font-size: 13px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  z-index: 10; max-width: 80vw;
+}
+.toast.bad { background: var(--danger); color: #fff; }
+.toast.ok { background: var(--ok); color: #06210f; }
+
+@media (max-width: 680px) {
+  .grid2 { grid-template-columns: 1fr; }
+}
+:root .debug-preview { max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }

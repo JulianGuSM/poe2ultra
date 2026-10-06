@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="manifest.open_in_tab" content="true" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>poe2ultra 翻译设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="wrap">
+    <!-- 吸顶哨兵：滚过它就给 header 加 .stuck（显示分隔线/阴影） -->
+    <div id="top-sentinel" class="top-sentinel" aria-hidden="true"></div>
+    <header class="top">
+      <div class="top-left">
+        <img src="/icon/48.png" alt="" width="36" height="36" />
+        <div>
+          <h1>poe2ultra 翻译设置</h1>
+          <p class="sub">攻略全文翻译 + 网页划词翻译 · 共用接口与术语设置</p>
+        </div>
+      </div>
+      <div class="top-right">
+        <span id="save-state" class="save-state"></span>
+        <button id="btn-test" class="btn" type="button">测试连接</button>
+        <button id="btn-save" class="btn primary" type="button">保存设置</button>
+      </div>
+    </header>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <section class="card">
+      <h2>攻略全文翻译与缓存</h2>
+      <p class="desc">攻略页面点击“开始翻译”后，固定生成简中、繁中两套独立译文并长期缓存。下方“目标语言”和“双版本输出”仅控制划词翻译；面板外观和费用设置不会使攻略缓存失效。</p>
+      <p class="hint">设置会自动保存在本机，不同步到 Google 账号。修改模型、提示词、术语表或翻译参数后，使用对应的新缓存；恢复原配置仍可复用旧缓存。导入术语表时，正在运行的攻略任务使用启动时的术语表，下一次任务使用新表。</p>
+      <p id="guide-cache-state" class="hint">正在读取攻略缓存…</p>
+      <button id="btn-guide-cache-clear" class="btn danger" type="button">清空攻略翻译缓存</button>
+    </section>
+    <!-- 1. 接口 -->
+    <section class="card">
+      <div class="card-head">
+        <h2>1 · 接口与模型</h2>
+        <p class="desc">
+          API Key 只保存在本机（<code>chrome.storage.local</code>），不会同步到 Google 账号。
+          在 <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">platform.deepseek.com</a> 创建。
+          “测试连接”会发送一小段样本文本，可能产生 API 费用。
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="apiKey">API 密钥</label>
+        <div class="row">
+          <div class="grow input-with-btn">
+            <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+            <button id="btn-toggle-key" class="btn tiny" type="button">显示</button>
+          </div>
+        </div>
+        <p class="hint" id="key-state"></p>
+      </div>
+
+      <div class="field">
+        <label for="baseUrl">接口地址（Base URL）</label>
+        <input id="baseUrl" type="text" spellcheck="false" placeholder="https://api.deepseek.com" />
+        <p class="hint">默认官方地址。填到 <code>/v1</code>、<code>/responses</code> 或完整端点都可以，脚本会按下面的 API 形态自动补全。使用自建中转时保存会请求该域名的访问授权。</p>
+        <p class="hint" id="perm-state"></p>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="apiMode">API 形态</label>
+          <select id="apiMode">
+            <option value="responses">Responses API（POST /responses）</option>
+            <option value="chat">Chat Completions（POST /chat/completions）</option>
+          </select>
+          <p class="hint" id="api-mode-state"></p>
+        </div>
+        <div class="field">
+          <label for="model">模型</label>
+          <input id="model" type="text" list="model-presets" spellcheck="false" />
+          <datalist id="model-presets">
+            <option value="deepseek-chat">deepseek-chat</option>
+            <option value="deepseek-reasoner">deepseek-reasoner</option>
+            <option value="deepseek-flash">deepseek-flash</option>
+            <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+          </datalist>
+          <p class="hint" id="model-hint"></p>
+        </div>
+        <div class="field">
+          <label for="thinkingMode">思考模式</label>
+          <select id="thinkingMode">
+            <option value="default">跟随模型默认（由服务端决定）</option>
+            <option value="disabled">关闭（最快最省，划词翻译推荐）</option>
+            <option value="enabled">开启（先想再答，术语更稳）</option>
+          </select>
+          <p class="hint" id="thinking-state"></p>
+        </div>
+        <div class="field">
+          <label for="reasoningEffort">思考强度</label>
+          <select id="reasoningEffort">
+            <option value="low">low（快）</option>
+            <option value="high">high（默认）</option>
+            <option value="max">max（最慢最贵）</option>
+          </select>
+          <p class="hint">仅「开启」时发送。</p>
+        </div>
+        <div class="field">
+          <label for="temperature">温度 temperature</label>
+          <input id="temperature" type="number" min="0" max="2" step="0.1" />
+          <p class="hint" id="temperature-hint"></p>
+        </div>
+        <div class="field">
+          <label for="maxTokens">最大输出 token</label>
+          <input id="maxTokens" type="number" min="64" max="384000" step="64" />
+          <p class="hint">思维链和译文共用这个额度，思考模式建议留足（默认 16384）。</p>
+        </div>
+        <div class="field">
+          <label for="timeoutSec">超时（秒）</label>
+          <input id="timeoutSec" type="number" min="5" max="600" step="5" />
+        </div>
+      </div>
+
+      <label class="switch">
+        <input id="stream" type="checkbox" />
+        <span>流式输出（边生成边显示，推荐开启）</span>
+      </label>
+
+      <details class="adv">
+        <summary>高级：自定义请求头 / 请求体（自建中转时用）</summary>
+        <div class="grid2">
+          <div class="field">
+            <label for="extraHeaders">额外请求头（JSON）</label>
+            <textarea id="extraHeaders" rows="3" spellcheck="false" placeholder='{"X-Custom": "value"}'></textarea>
+          </div>
+          <div class="field">
+            <label for="customBody">额外请求体（JSON，划词时覆盖同名字段）</label>
+            <textarea id="customBody" rows="3" spellcheck="false" placeholder='{"top_p": 0.9}'></textarea>
+          </div>
+        </div>
+        <p class="hint">攻略全文翻译固定保留 messages / input / instructions 和 JSON 输出格式（text / response_format），用于保证双语结构与数字校验；这些字段的覆盖只在划词翻译生效。</p>
+      </details>
+    </section>
+
+    <!-- 2. 提示词 -->
+    <section class="card">
+      <div class="card-head">
+        <h2>2 · 提示词</h2>
+        <p class="desc">系统提示词定义模型的角色与规则；用户提示词是每次请求真正发送的内容，用占位符把划词文本嵌进去。</p>
+      </div>
+
+      <div class="field">
+        <label class="switch">
+          <input id="dualOutput" type="checkbox" />
+          <span>划词翻译同时输出 <strong>简中 + 繁中</strong> 两个版本</span>
+        </label>
+        <p class="hint">
+          POE2 的简中与繁中是<strong>两套互相独立的译名</strong>，不是简繁字形转换
+          （<code>Abyssal Lich</code> → 简中「深渊巫妖」/ 繁中「深淵妖巫」）。
+          开启后模型按 <code>【简中】</code> <code>【繁中】</code> 两段输出，面板分块展示、各自可复制；
+          上下文里本地术语表、poe2db 直查与检索结果都会同时给出简繁两套名称。
+          关掉则退回「只翻下面这一种目标语言」的老行为。
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="targetLang">目标语言</label>
+        <input id="targetLang" type="text" list="lang-presets" spellcheck="false" placeholder="简体中文" />
+        <datalist id="lang-presets">
+          <option value="简体中文"></option>
+          <option value="繁體中文"></option>
+          <option value="English"></option>
+          <option value="日本語"></option>
+          <option value="한국어"></option>
+          <option value="Français"></option>
+          <option value="Deutsch"></option>
+          <option value="Русский"></option>
+        </datalist>
+        <p class="hint">
+          会替换提示词里的 <code>{{targetLang}}</code>；上面开启「简中 + 繁中」后，这个值只用于
+          决定先取哪一种中文译名（请求顺序与展示顺序），两版译文都会给出。
+        </p>
+      </div>
+
+      <div class="field">
+        <div class="label-row">
+          <label for="systemPrompt">系统提示词（system）</label>
+          <button class="btn tiny" type="button" data-reset="systemPrompt">恢复默认</button>
+        </div>
+        <textarea id="systemPrompt" rows="12" spellcheck="false"></textarea>
+      </div>
+
+      <div class="field">
+        <div class="label-row">
+          <label for="userPrompt">用户提示词（user）</label>
+          <button class="btn tiny" type="button" data-reset="userPrompt">恢复默认</button>
+        </div>
+        <textarea id="userPrompt" rows="7" spellcheck="false"></textarea>
+        <div class="chips" id="placeholder-chips"></div>
+        <p class="hint">点击上面的标签可插入占位符。<strong>必须包含 <code>{{text}}</code></strong>；如果忘了写，扩展会自动把原文追加到末尾。</p>
+      </div>
+
+      <div class="card-actions">
+        <button id="btn-preview" class="btn" type="button">预览划词请求</button>
+      </div>
+      <pre id="preview" class="preview" hidden></pre>
+    </section>
+
+    <!-- 3. 交互 -->
+    <section class="card">
+      <div class="card-head">
+        <h2>3 · 划词与面板</h2>
+        <p class="desc">控制选中文字后发生什么。</p>
+      </div>
+
+      <label class="switch">
+        <input id="showButton" type="checkbox" />
+        <span>划词后显示悬浮翻译按钮</span>
+      </label>
+      <label class="switch">
+        <input id="autoTranslate" type="checkbox" />
+        <span>划词后自动翻译（不再需要点击按钮）</span>
+      </label>
+      <label class="switch">
+        <input id="keepSource" type="checkbox" />
+        <span>面板中保留原文（可折叠）</span>
+      </label>
+      <label class="switch">
+        <input id="showPrompt" type="checkbox" />
+        <span>面板中折叠展示本次实际发出的 prompt（system / user 原文）</span>
+      </label>
+      <label class="switch">
+        <input id="autoClosePanel" type="checkbox" />
+        <span>点击页面空白处自动关闭结果面板</span>
+      </label>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="theme">面板主题</label>
+          <select id="theme">
+            <option value="auto">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="panelWidth">面板宽度（px）</label>
+          <input id="panelWidth" type="number" min="280" max="900" step="20" />
+        </div>
+        <div class="field">
+          <label for="maxChars">单次最大字符数</label>
+          <input id="maxChars" type="number" min="500" max="100000" step="500" />
+          <p class="hint">超出会提示缩短选区，避免产生高额费用。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 术语表与联网补充 -->
+    <section class="card">
+      <div class="card-head">
+        <h2>4 · 术语表与联网补充</h2>
+        <p class="desc">
+          翻译前先从<strong>本地 POE2 术语表</strong>里检索命中的术语，作为上下文交给模型；
+          本地没有覆盖到的内容，再用 <a href="https://tavily.com" target="_blank" rel="noreferrer">Tavily</a> 检索
+          <code>poe2db.tw</code> 补齐。不会再往请求体里塞服务端搜索工具（官方对内置工具是「忽略」）。
+        </p>
+      </div>
+
+      <label class="switch">
+        <input id="glossaryEnabled" type="checkbox" />
+        <span>启用本地术语表检索</span>
+      </label>
+      <label class="switch">
+        <input id="glossaryStrict" type="checkbox" />
+        <span>命中术语时要求模型必须采用表内译名</span>
+      </label>
+      <label class="switch">
+        <input id="showContext" type="checkbox" />
+        <span>结果面板里展示命中的术语与检索来源</span>
+      </label>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="glossaryMaxTerms">最多注入术语条数</label>
+          <input id="glossaryMaxTerms" type="number" min="1" max="200" step="1" />
+          <p class="hint">条数越多上下文越长，费用也越高。</p>
+        </div>
+        <div class="field">
+          <label for="glossaryCategories">限定分类（逗号分隔，留空＝全部）</label>
+          <input id="glossaryCategories" type="text" spellcheck="false" placeholder="GemEffects,keyword" />
+          <p class="hint" id="glossary-categories"></p>
+        </div>
+      </div>
+
+      <p class="hint" id="glossary-stats"></p>
+
+      <div class="card-actions">
+        <button id="btn-glossary-test" class="btn" type="button">测试抽取</button>
+        <input id="glossary-file" type="file" accept=".jsonl,.json,.txt" hidden />
+        <button id="btn-glossary-import" class="btn" type="button">导入更新后的术语表</button>
+        <button id="btn-glossary-reset" class="btn" type="button">恢复内置术语表</button>
+      </div>
+      <pre id="glossary-preview" class="preview" hidden></pre>
+
+      <div class="ws-block">
+        <label class="switch">
+          <input id="poe2dbDirectEnabled" type="checkbox" />
+          <span>术语表没收录时，<strong>按术语直接构造 poe2db 页面抓取</strong>（不经过搜索）</span>
+        </label>
+        <p class="hint">
+          从原文里挑出像专名的英文片段后，按 slug 规则构造
+          <code>https://poe2db.tw/&lt;语言&gt;/&lt;术语&gt;</code> 直接抓该页——页面标题就是它的正式译名。
+          slug 规则是从术语表 2244 条真实来源链接反推的，可复现 <strong>95.5%</strong>；
+          构造错了会 404，再回退到下面的 Tavily 检索。
+        </p>
+        <p class="hint">
+          每个术语会把 <code>/cn/</code> 与 <code>/tw/</code> <strong>两套译名都抓回来</strong>
+          （如 Abyssal Lich → 深渊巫妖 / 深淵巫妖），一起写进提示词，按目标语言取用；
+          <code>/us/</code> 页标题就是英文原名，只在这两种中文页都没命中时兜底一次。
+          通常一个术语需要 2 次请求；中文页均未命中时还会尝试英文页，最多 3 次，且受总请求预算限制。
+        </p>
+        <div class="grid2">
+          <div class="field">
+            <label for="poe2dbMaxTerms">最多直查几个术语</label>
+            <input id="poe2dbMaxTerms" type="number" min="1" max="10" step="1" />
+          </div>
+          <div class="field">
+            <label for="poe2dbRequestBudget">单次最多抓几个页面</label>
+            <input id="poe2dbRequestBudget" type="number" min="1" max="20" step="1" />
+            <p class="hint">
+              缓存命中不计入预算；404 会被记住，不会反复重抓。默认 8 ≈ 3 个术语 ×（cn+tw）。
+            </p>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button id="btn-poe2db-test" class="btn" type="button">测试直查</button>
+          <button id="btn-poe2db-clear" class="btn" type="button">清空页面缓存</button>
+        </div>
+        <p class="hint" id="poe2db-cache-state"></p>
+      </div>
+
+      <div class="ws-block">
+        <label class="switch">
+          <input id="tavilyEnabled" type="checkbox" />
+          <span>直查不到时，用 Tavily 检索 <code>poe2db.tw</code> 兜底</span>
+        </label>
+
+        <div class="field">
+          <label for="tavilyApiKey">Tavily API 密钥</label>
+          <div class="row">
+            <div class="grow input-with-btn">
+              <input id="tavilyApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="tvly-..." />
+              <button id="btn-toggle-tavily" class="btn tiny" type="button">显示</button>
+            </div>
+          </div>
+          <p class="hint" id="tavily-state"></p>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="tavilyMaxResults">最多检索结果数</label>
+            <input id="tavilyMaxResults" type="number" min="1" max="10" step="1" />
+          </div>
+          <div class="field">
+            <label for="tavilyDomains">限定站点</label>
+            <input id="tavilyDomains" type="text" spellcheck="false" placeholder="poe2db.tw" />
+            <p class="hint">逗号分隔，会作为 include_domains 传给 Tavily。</p>
+          </div>
+          <div class="field">
+            <label for="poe2dbLocales">限定语言路径</label>
+            <input id="poe2dbLocales" type="text" spellcheck="false" placeholder="us,cn,tw" />
+            <p class="hint">
+              poe2db.tw 的语言路径：<code>/us/</code> 英文原文、<code>/cn/</code> 简中、<code>/tw/</code> 繁中。
+              Tavily 的 include_domains 只能限到域名、限不到路径，所以插件会在返回结果里按这些前缀过滤，
+              <code>/jp/</code>、<code>/kr/</code> 等其它语言页会被丢掉；留空＝不限语言。
+            </p>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button id="btn-tavily-test" class="btn" type="button">测试 Tavily 检索</button>
+          <button id="btn-tavily-clear" class="btn" type="button">清空检索缓存</button>
+        </div>
+        <p class="hint" id="tavily-cache-state"></p>
+      </div>
+    </section>
+
+    <!-- 5. 费用估算 -->
+    <section class="card">
+      <div class="card-head">
+        <h2>5 · 费用估算</h2>
+        <p class="desc">
+          划词翻译完成后，结果面板底部会显示本次消耗金额（人民币估算值）。
+          沿用原插件内置价目表（不会自动更新），可在 <a id="price-link" href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing" target="_blank" rel="noreferrer">DeepSeek 官方价目表</a> 核对后填写自定义单价，
+          仅作估算，实际扣费以平台账单为准。
+        </p>
+      </div>
+
+      <label class="switch">
+        <input id="showCost" type="checkbox" />
+        <span>在结果面板显示本次消耗金额</span>
+      </label>
+      <label class="switch">
+        <input id="costAutoPeak" type="checkbox" />
+        <span>自动区分高峰 / 空闲时段（北京时间，空闲价为高峰价的一半）</span>
+      </label>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="costModel">计费模型</label>
+          <select id="costModel">
+            <option value="auto">自动（按当前模型推断）</option>
+            <option value="deepseek-flash">deepseek-flash（旧名 chat/reasoner 也按此计费）</option>
+            <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+            <option value="custom">自定义单价</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint" id="cost-state"></p>
+
+      <div class="grid2" id="custom-prices">
+        <div class="field">
+          <label for="priceCacheHit">输入·缓存命中（元/百万 tokens）</label>
+          <input id="priceCacheHit" type="number" min="0" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="priceCacheMiss">输入·缓存未命中（元/百万 tokens）</label>
+          <input id="priceCacheMiss" type="number" min="0" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="priceOutput">输出（元/百万 tokens）</label>
+          <input id="priceOutput" type="number" min="0" step="0.01" />
+        </div>
+      </div>
+      <p class="hint">高峰时段：北京时间周一至周五 9:00-12:00、14:00-18:00（法定节假日无法在本地判断，会按高峰价估算）。</p>
+    </section>
+
+    <section class="card" id="debug-section">
+      <div class="card-head">
+        <h2>6 · Debug 日志</h2>
+        <p class="desc">排查攻略全文翻译的返回内容或接口问题。开启后记录后续每批的完整原文、最终请求体（含提示词和术语）、模型返回、流式文本、处理阶段、缓存写入情况与错误详情；不额外发送翻译请求。</p>
+      </div>
+      <label class="switch">
+        <input id="debugEnabled" type="checkbox" />
+        <span>开启攻略翻译 Debug 模式（下一次开始 / 继续翻译时生效）</span>
+      </label>
+      <p class="hint">日志仅保存在本机，保留最近 500 批，超出后删除最早记录。API 密钥和鉴权请求头会脱敏；日志仍包含完整攻略文本及自定义提示词。旧版失败无法追溯，已缓存内容不会为调试重新请求。关闭开关不清除已有日志。</p>
+      <p id="debug-state" class="hint" role="status">正在读取调试日志…</p>
+      <div class="card-actions">
+        <button id="btn-debug-refresh" class="btn" type="button">刷新日志</button>
+        <button id="btn-debug-export" class="btn" type="button">导出全部调试日志（JSON）</button>
+        <button id="btn-debug-clear" class="btn danger" type="button">清空调试日志</button>
+      </div>
+      <div class="field">
+        <label for="debug-batch">查看批次</label>
+        <select id="debug-batch"></select>
+      </div>
+      <details>
+        <summary>查看所选批次的完整输入、输出与日志</summary>
+        <pre id="debug-preview" class="debug-preview"></pre>
+      </details>
+      <p class="hint">错误提示中的“调试记录”编号与这里的批次编号对应。也可在 chrome://extensions 中打开 poe2ultra 的 Service Worker 控制台，筛选 [poe2ultra debug] 查看实时日志。清空日志不会清除译文缓存。</p>
+    </section>
+
+    <footer class="bottom">
+      <button id="btn-reset-all" class="btn danger" type="button">恢复全部默认设置</button>
+      <span class="foot-note">快捷键 Alt+Q 可在 <code>chrome://extensions/shortcuts</code> 修改。</span>
+    </footer>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

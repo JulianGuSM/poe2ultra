@@ -1,0 +1,16 @@
+node_modules/
+.output/
+.wxt/
+.web-ext/
+coverage/
+*.log
+.env*
+.tmp/
+.pnpm-store/
+
+__pycache__/
+
+# Generated graphics: rebuild with scripts/make-store-assets.py and scripts/make-boosty-assets.py
+store/*.png
+store/raw/
+store/boosty/

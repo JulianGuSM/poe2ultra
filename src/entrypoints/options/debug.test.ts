@@ -1,0 +1,32 @@
+import 'fake-indexeddb/auto';
+import { afterEach, expect, it, vi } from 'vitest';
+import { fireEvent, waitFor } from '@testing-library/preact';
+import { DebugStore, DebugSession } from '@/lib/translation/debug';
+import { defaultSettings } from '@/lib/translation/settings';
+import { initDebugPanel } from './debug.js';
+
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
+it('views complete saved records and exports their JSON without issuing a translation request', async () => {
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  const store = new DebugStore(); await store.clear();
+  const source = 'Full source text. '.repeat(1000);
+  const trace = await new DebugSession(store, { ...defaultSettings, apiKey: 'sk-only-for-test' }).start({ batch: 14, batches: 100, segments: [{ kind: 'prose', texts: [source], protected: [] }] });
+  await trace.data('request', { body: { input: source }, headers: { Authorization: 'Bearer sk-only-for-test' } });
+  await trace.data('response', { text: '完整原始返回' });
+  await trace.finish('error', new Error('预期 2 段，实际 1 段'));
+  document.body.innerHTML = '<p id="debug-state"></p><select id="debug-batch"></select><pre id="debug-preview"></pre><button id="btn-debug-refresh"></button><button id="btn-debug-export"></button><button id="btn-debug-clear"></button>';
+  const sendMessage = vi.fn(); vi.stubGlobal('chrome', { runtime: { sendMessage } });
+  let exported: Blob | undefined;
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => { exported = blob as Blob; return 'blob:debug-export'; });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  initDebugPanel();
+  await waitFor(() => expect(document.getElementById('debug-state')!.textContent).toContain('已保存 1 批'));
+  expect(document.getElementById('debug-preview')!.textContent).toContain(source);
+  expect(document.getElementById('debug-preview')!.textContent).toContain('完整原始返回');
+  fireEvent.click(document.getElementById('btn-debug-export')!);
+  await waitFor(() => expect(exported).toBeDefined());
+  const json = await exported!.text();
+  expect(JSON.parse(json).records[0].batch).toBe(14);
+  expect(json).not.toContain('sk-only-for-test');
+  expect(sendMessage).not.toHaveBeenCalled();
+});
