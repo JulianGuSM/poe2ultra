@@ -108,7 +108,7 @@ describe('GearPanel', () => {
     expect(within(amulet).getByText('+3 more')).toBeTruthy();
 
     fireEvent.focus(amulet.closest('.tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').textContent).toContain('Elemental Conflux');
+    expect(screen.getByRole('dialog').textContent).toContain('Elemental Conflux');
   });
 
   it('opens the item tooltip from its slot card', () => {
@@ -116,7 +116,7 @@ describe('GearPanel', () => {
 
     fireEvent.focus(slotCard('Helmet').closest('.tooltip-trigger')!);
 
-    const tooltip = screen.getByRole('tooltip');
+    const tooltip = screen.getByRole('dialog');
     expect(tooltip.textContent).toContain("Atziri's Disdain");
     expect(tooltip.textContent).toContain('Idol of Egrin');
   });
@@ -128,7 +128,7 @@ describe('GearPanel', () => {
     expect(weapon.querySelector('.item-slot__grants')?.textContent).toBe('Chaos Bolt');
 
     fireEvent.focus(weapon.querySelector('.item-slot__grants')!.closest('.tooltip-trigger')!);
-    const tooltip = screen.getByRole('tooltip');
+    const tooltip = screen.getByRole('dialog');
     expect(tooltip.querySelector('.tooltip__title')?.textContent).toBe('Chaos Bolt');
     expect(tooltip.querySelector('.tooltip__subtitle')?.textContent).toBe('Skill Gem');
   });
@@ -158,7 +158,7 @@ describe('GearPanel', () => {
 
     fireEvent.focus(slotCard('Ring 2').closest('.tooltip-trigger')!);
 
-    const implicit = screen.getByRole('tooltip').querySelector('.tooltip__section--implicit');
+    const implicit = screen.getByRole('dialog').querySelector('.tooltip__section--implicit');
     expect(implicit?.textContent).toBe('+(7-13)% to Chaos Resistance');
   });
 
@@ -167,7 +167,7 @@ describe('GearPanel', () => {
 
     fireEvent.focus(slotCard('Helmet').querySelector('.item-slot__socket')!.closest('.tooltip-trigger')!);
 
-    const tooltip = screen.getByRole('tooltip');
+    const tooltip = screen.getByRole('dialog');
     expect(tooltip.querySelector('.tooltip__title')?.textContent).toBe('Idol of Egrin');
     expect(tooltip.textContent).toContain('Socketable');
   });
@@ -182,7 +182,7 @@ describe('GearPanel', () => {
     expect(rows[1]?.querySelector('.priority__slot')?.textContent).toBe('Belt');
 
     fireEvent.focus(rows[1]!.querySelector('.tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').textContent).toContain('Ingenuity');
+    expect(screen.getByRole('dialog').textContent).toContain('Ingenuity');
   });
 
   it("shows the author's gear notes below the gear and priority", () => {

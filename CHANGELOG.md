@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.5.1 — poe2ultra
+
+- Separate full-guide and selection prompts into their own files; send the requested guide system text without appended selection, glossary or formatting rules.
+- Keep batch text, terminology, sources and the JSON return shape in guide user data; preserve both API transports and selection customization.
+- Preserve existing paid guide caches when selection prompts change, and clarify the scope of prompt settings in the Chinese options page.
+
 ## 1.5.0 — poe2ultra
 
 - Translate complete paragraphs as plain text, with no numeric markers or formatting-span alignment checks.

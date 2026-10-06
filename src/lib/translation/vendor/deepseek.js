@@ -2,7 +2,7 @@
  * Chat Completions 客户端（OpenAI 兼容协议，端点 /chat/completions）。
  * 只被 background 使用：请求里带 API Key，绝不能放到页面上下文里发。
  */
-import { composePrompt } from './context.js';
+import { composePrompt } from '../../selection/prompt.js';
 import {
   TranslateError,
   assertOk,
@@ -28,21 +28,27 @@ export function buildThinkingParams(settings = {}) {
   return {};
 }
 
-/** 组装 messages（系统/用户提示词都由 context.js 统一合成）。 */
-export function buildMessages(settings, input) {
-  const { systemText, userText } = composePrompt(settings, input);
+/**
+ * 组装 messages（全文使用显式传入的提示词；划词使用 selection/prompt.js）。
+ * @param {{systemText: string, userText: string} | null} [prompt]
+ */
+export function buildMessages(settings, input, prompt = null) {
+  const { systemText, userText } = prompt ?? composePrompt(settings, input);
   const messages = [];
   if (systemText) messages.push({ role: 'system', content: systemText });
   messages.push({ role: 'user', content: userText });
   return messages;
 }
 
-/** 组装完整请求体；设置页的「预览最终请求」也调用它，保证预览与真实请求一致。 */
-export function buildBody(settings, input) {
+/**
+ * 组装完整请求体；设置页的「预览最终请求」也调用它，保证预览与真实请求一致。
+ * @param {{systemText: string, userText: string} | null} [prompt]
+ */
+export function buildBody(settings, input, prompt = null) {
   const stream = settings.stream !== false;
   const body = {
     model: String(settings.model || '').trim() || 'deepseek-chat',
-    messages: buildMessages(settings, input),
+    messages: buildMessages(settings, input, prompt),
     temperature: Number.isFinite(Number(settings.temperature)) ? Number(settings.temperature) : 1.3,
     max_tokens: Math.max(1, Number(settings.maxTokens) || 8192),
     stream,
@@ -57,7 +63,7 @@ export function buildBody(settings, input) {
  * 发起翻译请求。
  * @returns {Promise<{text:string, reasoning:string, usage:object|null, model:string, finishReason:string, citations:Array}>}
  */
-export async function translate({ settings, input, onChunk = () => {}, onReasoning = () => {}, signal, debug }) {
+export async function translate({ settings, input, onChunk = () => {}, onReasoning = () => {}, signal, debug, prompt = null }) {
   const apiKey = String(settings.apiKey || '').trim();
   if (!apiKey) {
     throw new TranslateError('尚未填写 API Key，请点击扩展图标 → 打开设置。', {
@@ -65,7 +71,7 @@ export async function translate({ settings, input, onChunk = () => {}, onReasoni
     });
   }
 
-  const body = buildBody(settings, input);
+  const body = buildBody(settings, input, prompt);
   const model = body.model;
 
   return withRequest(

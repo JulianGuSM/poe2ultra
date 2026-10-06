@@ -2,7 +2,8 @@ import { BilingualText } from '@/ui/translation/BilingualText';
 import { TranslationContext } from '@/ui/translation/BilingualText';
 import type { ComponentChildren } from 'preact';
 import { createContext, render } from 'preact';
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { X } from 'lucide-preact';
 import { type Placement, placeTooltip } from '@/lib/tooltip/placement';
 import type { TooltipModel } from '@/lib/tooltip/tooltip-model';
 import { Icon } from '@/ui/common/Icon';
@@ -18,31 +19,38 @@ interface TooltipApi {
 
 const TooltipContext = createContext<TooltipApi | null>(null);
 
-/** Hosts the single tooltip of the UI; triggers inside it open and close it. */
-export function TooltipProvider({ children }: { children: ComponentChildren }) {
+/** One persistent, non-modal detail card; another hover cannot replace it until dismissed. */
+export function TooltipProvider({ children, resetKey }: { children: ComponentChildren; resetKey?: string }) {
   const [open, setOpen] = useState<{ anchor: HTMLElement; model: TooltipModel } | null>(null);
+  const close = useCallback((anchor?: HTMLElement) => setOpen(current => (!anchor || current?.anchor === anchor ? null : current)), []);
+  useEffect(() => close(), [resetKey, close]);
 
   const api = useMemo<TooltipApi>(
     () => ({
-      open: (anchor, model) => setOpen({ anchor, model }),
-      close: (anchor) => setOpen((current) => (!anchor || current?.anchor === anchor ? null : current)),
+      open: (anchor, model) => setOpen(current => current ?? { anchor, model }),
+      close,
       openAnchor: open?.anchor ?? null,
     }),
-    [open],
+    [open, close],
   );
 
   useEffect(() => {
     if (!open) return;
-    // The tooltip is positioned once, so any scroll would detach it from its trigger.
-    const close = () => setOpen(null);
-    document.addEventListener('scroll', close, true);
-    return () => document.removeEventListener('scroll', close, true);
-  }, [open]);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open, close]);
 
   return (
     <TooltipContext.Provider value={api}>
       {children}
-      {open && <TooltipOutsideOverlay anchor={open.anchor} model={open.model} />}
+      {open && <TooltipOutsideOverlay anchor={open.anchor} model={open.model} onClose={() => close()} />}
     </TooltipContext.Provider>
   );
 }
@@ -52,15 +60,19 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
   const ref = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const close = api?.close;
+  useEffect(() => {
+    const anchor = ref.current;
+    return () => {
+      clearTimeout(timer.current);
+      if (anchor) close?.(anchor);
+    };
+  }, [close]);
 
   if (!model || !api) return <>{children}</>;
 
-  const show = () => ref.current && api.open(ref.current, model);
-  const hide = () => {
-    clearTimeout(timer.current);
-    if (ref.current) api.close(ref.current);
-  };
+  const show = () => ref.current && !api.openAnchor && api.open(ref.current, model);
+  const cancelPending = () => clearTimeout(timer.current);
   const isOpen = api.openAnchor !== null && api.openAnchor === ref.current;
 
   return (
@@ -68,19 +80,20 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
       ref={ref}
       class="tooltip-trigger"
       tabIndex={0}
-      aria-describedby={isOpen ? TOOLTIP_ID : undefined}
+      aria-haspopup="dialog"
+      aria-expanded={isOpen}
+      aria-controls={isOpen ? TOOLTIP_ID : undefined}
       onPointerOver={(event) => {
-        // pointerover bubbles from nested triggers (e.g. a rune inside an item card): only the innermost trigger
-        // under the pointer shows its tooltip, and the outer one takes over again once the pointer is back on it.
+        // Only the innermost trigger opens a new card; an already pinned card keeps ownership.
         clearTimeout(timer.current);
         const owner = (event.target as Element).closest('.tooltip-trigger');
-        if (owner === ref.current && api.openAnchor !== ref.current) timer.current = setTimeout(show, HOVER_DELAY_MS);
+        if (owner === ref.current && !api.openAnchor) timer.current = setTimeout(show, HOVER_DELAY_MS);
       }}
-      onPointerLeave={hide}
-      onFocus={show}
-      onBlur={hide}
+      onPointerLeave={cancelPending}
+      onFocus={event => { if ((event.target as Element).closest('.tooltip-trigger') === ref.current) show(); }}
+      onBlur={cancelPending}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') hide();
+        if (event.key === 'Escape') { cancelPending(); api.close(); }
       }}
     >
       {children}
@@ -89,37 +102,50 @@ export function WithTooltip({ model, children }: { model: TooltipModel | null; c
 }
 
 /** Outside the overlay's stacking context: the site's passive tree is laid over the overlay and would cover it. */
-function TooltipOutsideOverlay({ anchor, model }: { anchor: HTMLElement; model: TooltipModel }) {
+function TooltipOutsideOverlay({ anchor, model, onClose }: { anchor: HTMLElement; model: TooltipModel; onClose: () => void }) {
   const layer = anchor.closest('.overlay')?.parentElement;
-  const tooltip = <TooltipLayer anchor={anchor} model={model} />;
+  const tooltip = <TooltipLayer anchor={anchor} model={model} onClose={onClose} />;
   return layer ? <Portal parent={layer}>{tooltip}</Portal> : tooltip;
 }
 
-function TooltipLayer({ anchor, model }: { anchor: HTMLElement; model: TooltipModel }) {
+function TooltipLayer({ anchor, model, onClose }: { anchor: HTMLElement; model: TooltipModel; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
 
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
-    setPlacement(
+    const origin = anchor.getBoundingClientRect();
+    const position = () => setPlacement(
       placeTooltip({
-        anchor: anchor.getBoundingClientRect(),
+        anchor: origin,
         size: { width: element.offsetWidth, height: element.offsetHeight },
         viewport: { width: window.innerWidth, height: window.innerHeight },
       }),
     );
+    position();
+    window.addEventListener('resize', position);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);
+    observer?.observe(element);
+    return () => { window.removeEventListener('resize', position); observer?.disconnect(); };
   }, [anchor, model]);
 
   return (
     <div
       ref={ref}
       id={TOOLTIP_ID}
-      role="tooltip"
+      role="dialog"
+      aria-label={model.title}
+      aria-modal="false"
       class={`tooltip tooltip--${model.accent}`}
       style={placement ? { left: `${placement.left}px`, top: `${placement.top}px` } : { visibility: 'hidden' }}
     >
-      <TooltipCard model={model} />
+      <div class="tooltip__controls">
+        <button type="button" class="tooltip__close" aria-label="Close details" title="Close details (Esc)" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
+      <div class="tooltip__body"><TooltipCard model={model} /></div>
     </div>
   );
 }

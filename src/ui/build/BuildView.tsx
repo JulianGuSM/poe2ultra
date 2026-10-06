@@ -86,7 +86,7 @@ export function BuildView({
   const tab = tabs.find((t) => t.id === route.tab)!;
   const variant = build.variants.find((v) => v.id === route.variantId) ?? build.variants[0];
   return (
-    <TranslationProvider records={translation.state.records} locale={translation.locale}><TooltipProvider>
+    <TranslationProvider records={translation.state.records} locale={translation.locale}><TooltipProvider resetKey={`${build.id}:${route.tab}:${route.variantId}`}>
       <div class="build-view">
         {!headerCollapsed && <BuildHeader build={build} />}
         <div class="tab-bar">

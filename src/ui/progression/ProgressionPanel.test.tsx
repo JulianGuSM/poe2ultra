@@ -116,10 +116,11 @@ describe('ProgressionPanel', () => {
     renderPanel();
 
     fireEvent.focus(within(group('Skills')).getByText('Chaos Bolt').closest('.tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe('Chaos Bolt');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Chaos Bolt');
 
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
     fireEvent.focus(within(group('Gear')).getByText("Atziri's Disdain").closest('.tooltip-trigger')!);
-    expect(screen.getByRole('tooltip').querySelector('.tooltip__title')?.textContent).toBe("Atziri's Disdain");
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe("Atziri's Disdain");
   });
 
   it('lists the quest rewards the author took, by act', () => {

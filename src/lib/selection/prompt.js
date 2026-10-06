@@ -1,11 +1,68 @@
+/** Selection-only prompts, context formatting and composition. Guide translation never uses this composer. */
+import { DUAL_MARKERS, isDualOutput, targetLabelOf } from '../translation/vendor/dual.js';
+
+export const DEFAULT_SYSTEM_PROMPT = `你是一名专业的翻译引擎，负责把用户提供的文本翻译成目标语言。
+
+规则：
+1. 只输出译文本身，不要输出解释、前言、总结，也不要使用 Markdown 代码块包裹。
+2. POE2 的简中与繁中是**两套互相独立的译名**，不是简繁字形转换。上下文里的术语表会同时给出
+   「简中」「繁中」两列：简中译文只用简中那列，繁中译文只用繁中那列，不要互相推导。
+   标为「待补」的一列没有权威译名，可自行判断用通行说法，但不要臆造、也不要用另一列顶替。
+3. 保持原文的段落、换行、列表和标点结构；原文换行处译文也换行。
+4. 保留代码、命令、变量名、URL、邮箱、路径、数字与单位不被改动或翻译。
+5. 人名、地名、作品名、游戏术语、专业术语采用通行译名；若没有通行译名，保留原文并在首次出现时用括号补充译名。
+6. 文本若已经是目标语言，原样返回，不要改写。
+7. 文本若明显是断句、单词或短语，给出最贴切的对应译法即可，不要脑补上下文。`;
+
+export const DEFAULT_USER_PROMPT = `请把下面的文本翻译成{{targetLang}}。
+
+<text>
+{{text}}
+</text>`;
+
 /**
- * 把「本地术语表命中」与「Tavily 检索结果」组装成提示词上下文。
+ * 双版本模式（设置页「一次输出简中 + 繁中」）下**自动追加**到系统提示词里的格式要求。
  *
- * 两种 API 形态（Chat Completions / Responses）都走这里，
- * 设置页的「预览最终请求」也用它，保证预览和真实请求一致。
+ * 之所以自动注入、而不是写死在可编辑的默认提示词里：
+ * 用户改过提示词、或把双版本开关关掉再打开，格式要求都不会丢；
+ * 关掉开关时它也不会残留在提示词里让模型多输出一版。
  */
-import { renderTemplate, DUAL_RULE } from './defaults.js';
-import { isDualOutput, targetLabelOf } from './dual.js';
+export const DUAL_RULE = [
+  '本次要求一次给出两版译文，必须严格按下面两个标签分段（标签各占一行、顺序固定）：',
+  DUAL_MARKERS.cn,
+  '（简体中文译文）',
+  DUAL_MARKERS.tw,
+  '（繁體中文譯文）',
+  '标签内是译文本体，标签之外不要写任何解释、前言或总结；两版都要完整翻译，',
+  '不能只给一版，也不能把简中译文用字形转换当成繁中译文。',
+].join('\n');
+
+/** 可在提示词里使用的占位符，设置页会展示给用户。 */
+export const PLACEHOLDERS = [
+  { token: '{{text}}', desc: '划词选中的原文（必填，缺失时会自动追加到末尾）' },
+  { token: '{{targetLang}}', desc: '目标语言；双版本模式下固定为「简中与繁中两个版本」' },
+  { token: '{{glossary}}', desc: '命中的本地术语表条目（简中 / 繁中两列）；不写也会自动前置到提示词前' },
+  { token: '{{sources}}', desc: 'poe2db.tw 检索结果；不写也会自动前置到提示词前' },
+  { token: '{{title}}', desc: '当前网页标题' },
+  { token: '{{url}}', desc: '当前网页地址' },
+  { token: '{{pageLang}}', desc: '网页声明的语言（如 en、ja）' },
+];
+
+
+/**
+ * 渲染提示词模板。未提供 {{text}} 时自动把原文追加到末尾，避免用户误删占位符后
+ * 请求里完全没有原文。
+ */
+export function renderTemplate(template, vars) {
+  const tpl = String(template ?? '');
+  let out = tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (whole, key) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key] ?? '') : whole
+  );
+  if (!/\{\{\s*text\s*\}\}/.test(tpl)) {
+    out = `${out}\n\n${vars.text ?? ''}`;
+  }
+  return out.trim();
+}
 
 /**
  * 命中术语时追加到系统提示词的规则（可用 glossaryStrict 关掉）。

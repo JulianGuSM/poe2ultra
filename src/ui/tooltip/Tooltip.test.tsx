@@ -44,20 +44,20 @@ describe('WithTooltip', () => {
     act(() => {
       vi.advanceTimersByTime(100);
     });
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(60);
     });
-    const tooltip = screen.getByRole('tooltip');
-    expect(trigger().getAttribute('aria-describedby')).toBe(tooltip.id);
+    const tooltip = screen.getByRole('dialog');
+    expect(trigger().getAttribute('aria-controls')).toBe(tooltip.id);
   });
 
   it('renders everything the model describes', () => {
     renderTrigger();
     fireEvent.focus(trigger());
 
-    const tooltip = screen.getByRole('tooltip');
+    const tooltip = screen.getByRole('dialog');
     expect(tooltip.classList.contains('tooltip--unique')).toBe(true);
     expect(tooltip.querySelector('img')?.getAttribute('src')).toBe('https://cdn/atziri.webp');
     for (const text of [
@@ -92,10 +92,10 @@ describe('WithTooltip', () => {
       vi.advanceTimersByTime(500);
     });
 
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('closes when the pointer leaves', () => {
+  it('stays open after pointer leave until explicitly closed', () => {
     renderTrigger();
     fireEvent.pointerOver(trigger());
     act(() => {
@@ -104,32 +104,37 @@ describe('WithTooltip', () => {
 
     fireEvent.pointerLeave(trigger());
 
-    expect(screen.queryByRole('tooltip')).toBeNull();
-    expect(trigger().hasAttribute('aria-describedby')).toBe(false);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(trigger().hasAttribute('aria-controls')).toBe(false);
   });
 
-  it('opens immediately on keyboard focus and closes on blur or Escape', () => {
+  it('opens on keyboard focus, survives blur and closes on Escape', () => {
     renderTrigger();
 
     expect(trigger().getAttribute('tabindex')).toBe('0');
     fireEvent.focus(trigger());
-    expect(screen.getByRole('tooltip')).toBeTruthy();
+    expect(screen.getByRole('dialog')).toBeTruthy();
 
     fireEvent.keyDown(trigger(), { key: 'Escape' });
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     fireEvent.focus(trigger());
     fireEvent.blur(trigger());
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('closes when something scrolls', () => {
+  it('stays fixed when the page or details scroll', () => {
     renderTrigger();
     fireEvent.focus(trigger());
 
+    const before = screen.getByRole('dialog').style.cssText;
     fireEvent.scroll(document);
-
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.scroll(screen.getByRole('dialog'));
+    expect(screen.getByRole('dialog').style.cssText).toBe(before);
   });
 
   it('positions the tooltip next to the trigger', () => {
@@ -138,11 +143,11 @@ describe('WithTooltip', () => {
 
     fireEvent.focus(trigger());
 
-    const style = screen.getByRole('tooltip').style;
+    const style = screen.getByRole('dialog').style;
     expect([style.left, style.top]).toEqual(['100px', '128px']);
   });
 
-  it('lets a nested trigger take over and hands the tooltip back when the pointer returns', () => {
+  it('keeps the pinned card when another trigger is hovered, then allows the nested trigger after closing', () => {
     const rune = { ...MODEL, title: 'Idol of Egrin', subtitle: 'Socketable' };
     render(
       <TooltipProvider>
@@ -154,7 +159,7 @@ describe('WithTooltip', () => {
         </WithTooltip>
       </TooltipProvider>,
     );
-    const title = () => screen.queryByRole('tooltip')?.querySelector('.tooltip__title')?.textContent;
+    const title = () => screen.queryByRole('dialog')?.querySelector('.tooltip__title')?.textContent;
 
     fireEvent.pointerOver(screen.getByText('Item card'));
     act(() => {
@@ -167,7 +172,12 @@ describe('WithTooltip', () => {
     act(() => {
       vi.advanceTimersByTime(200);
     });
+    expect(title()).toBe("Atziri's Disdain");
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+    fireEvent.pointerOver(runeImage);
+    act(() => { vi.advanceTimersByTime(200); });
     expect(title()).toBe('Idol of Egrin');
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
 
     fireEvent.pointerLeave(runeImage.parentElement!);
     fireEvent.pointerOver(screen.getByText('Item card'));
@@ -188,7 +198,7 @@ describe('WithTooltip', () => {
 
     fireEvent.focus(trigger());
 
-    const tooltip = screen.getByRole('tooltip');
+    const tooltip = screen.getByRole('dialog');
     expect(container.querySelector('.overlay')?.contains(tooltip)).toBe(false);
     expect(container.contains(tooltip)).toBe(true);
   });

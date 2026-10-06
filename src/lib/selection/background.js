@@ -9,7 +9,7 @@ import { getSettings, saveSettings, resetSettings } from '../translation/prefere
 import { TranslateError, buildEndpoint, endpointOrigin } from '../translation/vendor/api-base.js';
 import { translate as translateChat, buildBody as buildChatBody } from '../translation/vendor/deepseek.js';
 import { translate as translateResponses, buildBody as buildResponsesBody } from '../translation/vendor/responses.js';
-import { describePrompt, describeGlossaryState, groupDirectHits } from '../translation/vendor/context.js';
+import { describePrompt, describeGlossaryState, groupDirectHits } from './prompt.js';
 import { DUAL_TARGET_SHORT, formatDualForCopy, isDualOutput, parseDualOutput } from '../translation/vendor/dual.js';
 import { estimateCost } from '../translation/vendor/pricing.js';
 import {

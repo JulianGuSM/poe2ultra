@@ -1,6 +1,18 @@
 import { browser } from 'wxt/browser';
 import { defaultSettings, normalizeSettings, SETTINGS_KEY, validateSettings } from './settings';
 import { endpointOrigin } from './vendor/api-base.js';
+import type { LegacyCachePrompts } from './profile';
+
+export const GUIDE_CACHE_PROMPTS_KEY = 'poe2ultra.translation.legacy-cache-prompts';
+export async function guideCachePrompts(): Promise<LegacyCachePrompts> {
+  const saved = await browser.storage.local.get([GUIDE_CACHE_PROMPTS_KEY, SETTINGS_KEY]);
+  const pinned = saved[GUIDE_CACHE_PROMPTS_KEY] as LegacyCachePrompts | undefined;
+  if (pinned && typeof pinned.systemPrompt === 'string' && typeof pinned.userPrompt === 'string') return pinned;
+  const settings = normalizeSettings(saved[SETTINGS_KEY]);
+  const baseline = { systemPrompt: settings.systemPrompt, userPrompt: settings.userPrompt };
+  await browser.storage.local.set({ [GUIDE_CACHE_PROMPTS_KEY]: baseline });
+  return baseline;
+}
 
 export async function getSettings() {
   const saved = await browser.storage.local.get(SETTINGS_KEY);
@@ -9,10 +21,12 @@ export async function getSettings() {
 export async function saveSettings(patch: object) {
   const clean = normalizeSettings({ ...await getSettings(), ...patch });
   validateSettings(clean);
+  await guideCachePrompts();
   await browser.storage.local.set({ [SETTINGS_KEY]: clean });
   return clean;
 }
 export async function resetSettings() {
+  await guideCachePrompts();
   await browser.storage.local.set({ [SETTINGS_KEY]: defaultSettings });
   return { ...defaultSettings };
 }

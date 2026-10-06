@@ -1,14 +1,13 @@
 /**
  * 设置页逻辑。
  */
-import { PLACEHOLDERS } from '../../lib/translation/vendor/defaults.js';
+import { PLACEHOLDERS, groupDirectHits, poe2dbLocaleLabel } from '../../lib/selection/prompt.js';
 import { defaultSettings as DEFAULTS } from '../../lib/translation/settings';
 import { getSettings, saveSettings, resetSettings, maskKey } from './store.js';
 import { buildEndpoint, endpointOrigin } from '../../lib/translation/vendor/api-base.js';
 import { buildBody as buildChatBody } from '../../lib/translation/vendor/deepseek.js';
 import { buildBody as buildResponsesBody } from '../../lib/translation/vendor/responses.js';
 import { compactRows, parseGlossaryText } from '../../lib/translation/vendor/glossary.js';
-import { groupDirectHits, poe2dbLocaleLabel } from '../../lib/translation/vendor/context.js';
 import { PRICE_TABLE, resolveRates } from '../../lib/translation/vendor/pricing.js';
 import { initDebugPanel } from './debug.js';
 

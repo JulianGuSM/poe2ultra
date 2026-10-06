@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import assert from 'node:assert/strict';
 import { indexedDB } from 'fake-indexeddb';
 import { webcrypto } from 'node:crypto';
+import { GUIDE_SYSTEM_PROMPT } from '../src/lib/translation/guide-prompt.js';
 
 const manifest = JSON.parse(readFileSync('.output/chrome-mv3/manifest.json', 'utf8'));
 assert.equal(manifest.name, 'poe2ultra');
@@ -41,6 +42,7 @@ const fetchMock = async (url, init) => {
   assert.ok(body.messages.at(-1).content.includes('深淵妖巫'));
   const isGuide = !!body.response_format;
   if (isGuide) {
+    assert.equal(body.messages[0].content, GUIDE_SYSTEM_PROMPT);
     assert.deepEqual(body.response_format, { type: 'json_object' });
     assert.ok(!body.messages.at(-1).content.includes('⟦N'));
     assert.ok(body.messages.at(-1).content.includes('25%'));
@@ -127,9 +129,10 @@ assert.ok(selectionMessages.some(m => m.type === 'chunk'));
 assert.equal(calls, 2);
 assert.ok(manifest.content_scripts.some(entry => entry.matches.includes('https://*/*') && entry.js.includes('content-scripts/selection.js')));
 assert.equal(manifest.commands['translate-selection'].suggested_key.default, 'Alt+Q');
-await settingsMessage({ action: 'save', settings: { ...saved.settings, debugEnabled: true } });
+await settingsMessage({ action: 'save', settings: { ...saved.settings, debugEnabled: true,
+  systemPrompt: 'SELECTION ONLY SYSTEM', userPrompt: 'SELECTION ONLY USER {{text}}' } });
 await job('translate', segments);
-assert.equal(calls, 2, 'Enabling debug must not invalidate paid caches');
+assert.equal(calls, 2, 'Enabling debug or editing selection prompts must not invalidate paid guide caches');
 const malformed = [{ kind: 'prose', texts: ['Use Abyssal Lich for 25% damage.', 'Stay safe.'], protected: [] }];
 incompleteResponse = true;
 await assert.rejects(job('translate', malformed), /未返回有效译文[\s\S]*繁中[\s\S]*调试记录/);

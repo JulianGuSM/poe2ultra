@@ -31,7 +31,7 @@ describe('cache profile compatibility', () => {
     expect(await translationProfile(s)).toBe(await digest(JSON.stringify(legacy)));
   });
   it('ignores selection UI, credentials, prices and language for full-page caching', async () => {
-    expect(await translationProfile({ ...defaultSettings, theme: 'dark', dualOutput: false, targetLang: '日本語', panelWidth: 600, priceOutput: 7, apiKey: 'changed', timeoutMs: 60000, stream: false, debugEnabled: true })).toBe(await translationProfile(defaultSettings));
+    expect(await translationProfile({ ...defaultSettings, systemPrompt: 'selection system only', userPrompt: 'selection user only', theme: 'dark', dualOutput: false, targetLang: '日本語', panelWidth: 600, priceOutput: 7, apiKey: 'changed', timeoutMs: 60000, stream: false, debugEnabled: true })).toBe(await translationProfile(defaultSettings));
   });
   it('separates translation parameters and imported terminology, but reuses restored profiles', async () => {
     const original = await translationProfile(defaultSettings);

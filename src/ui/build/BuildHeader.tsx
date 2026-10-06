@@ -1,16 +1,18 @@
-import { BilingualText } from '@/ui/translation/BilingualText';
+import { BilingualText, TranslationContext } from '@/ui/translation/BilingualText';
 import { Flag, Tag, User } from 'lucide-preact';
-import { useMemo } from 'preact/hooks';
+import { useContext, useMemo } from 'preact/hooks';
 import type { Build } from '@/lib/build/model';
-import { richTextSummary } from '@/lib/rich-text/summary';
+import { richTextSummaryEntry, shortenSummary } from '@/lib/rich-text/summary';
 import { Icon } from '@/ui/common/Icon';
 
 /** Build identity and meta; purely informational — page controls live in the tab bar. */
 export function BuildHeader({ build }: { build: Build }) {
-  const summary = useMemo(() => richTextSummary(build.sections[0]?.content ?? null), [build]);
+  const summary = useMemo(() => build.sections.map(section => richTextSummaryEntry(section.content)).find(Boolean), [build]);
+  const { locale, texts } = useContext(TranslationContext);
+  const translated = locale !== 'en' && summary ? texts.get(summary.source) : undefined;
 
   return (
-    <header class="build-header">
+    <header class={`build-header${summary ? '' : ' build-header--no-summary'}`}>
       <Icon src={build.headerImageUrl} class="build-header__art" missing="none" />
       <div class="build-header__identity">
         <h1 class="build-header__title"><BilingualText text={build.title} /></h1>
@@ -42,7 +44,10 @@ export function BuildHeader({ build }: { build: Build }) {
           )}
         </ul>
       </div>
-      {summary && <p class="build-header__summary">{summary}</p>}
+      {summary && <p class="build-header__summary">
+        <span class="build-header__excerpt">{shortenSummary(summary.text)}</span>
+        {translated && <span class="build-header__excerpt translation-text" lang={locale === 'cn' ? 'zh-Hans' : 'zh-Hant'}>{shortenSummary(translated)}</span>}
+      </p>}
     </header>
   );
 }

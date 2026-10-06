@@ -423,4 +423,5 @@ WXT + TS + Preact + Vitest, `git init`, скрипты `test` / `typecheck` / `b
 - [x] 1.4.1: Add explicit POE2 guide localization context and precise numeric-marker diagnostics with readable, targeted excerpts. Preserve cached work and strict validation.
 - [x] 1.4.2: Persistent, opt-in batch debug logs with full request/HTTP/model output, credential redaction, export and a Chinese viewer; detailed span-count/type failures without retries or cache invalidation.
 - [x] 1.5.0: Whole-block translation without numeric markers or span alignment; original plus grey translation, old-cache reuse and retained debug/selection functionality.
+- [x] 1.5.1: Separate guide/selection prompt files, exact guide system text without appended rules, independent selection settings and compatible paid caches.
 - [ ] User's Chrome installation and live DeepSeek translation with the user's configured key.

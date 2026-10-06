@@ -9,9 +9,9 @@
  *
  * 不在请求体里声明服务端搜索工具（web_search 等）：DeepSeek 官方兼容性表把内置工具
  * 标为「忽略」，声明了也不生效。术语补充改由本地术语表 + Tavily(poe2db.tw) 完成，
- * 见 glossary.js / tavily.js / context.js。
+ * 见 glossary.js / tavily.js，以及 selection/prompt.js 中的划词提示词。
  */
-import { composePrompt } from './context.js';
+import { composePrompt } from '../../selection/prompt.js';
 import {
   TranslateError,
   assertOk,
@@ -31,10 +31,13 @@ export function buildReasoningParams(settings = {}) {
   return {}; // 跟随服务端默认（官方当前=开启、强度 high）
 }
 
-/** 组装完整请求体；设置页的「预览最终请求」也调用它。 */
-export function buildBody(settings, input) {
+/**
+ * 组装完整请求体；设置页的「预览最终请求」也调用它。
+ * @param {{systemText: string, userText: string} | null} [prompt]
+ */
+export function buildBody(settings, input, prompt = null) {
   const stream = settings.stream !== false;
-  const { systemText, userText } = composePrompt(settings, input);
+  const { systemText, userText } = prompt ?? composePrompt(settings, input);
 
   const body = {
     model: String(settings.model || '').trim() || 'deepseek-flash',
@@ -146,7 +149,7 @@ export function finishReasonOf(json) {
  * 发起翻译请求。
  * @returns {Promise<{text:string, reasoning:string, usage:object|null, model:string, finishReason:string, citations:Array}>}
  */
-export async function translate({ settings, input, onChunk = () => {}, onReasoning = () => {}, signal, debug }) {
+export async function translate({ settings, input, onChunk = () => {}, onReasoning = () => {}, signal, debug, prompt = null }) {
   const apiKey = String(settings.apiKey || '').trim();
   if (!apiKey) {
     throw new TranslateError('尚未填写 API Key，请点击扩展图标 → 打开设置。', {
@@ -154,7 +157,7 @@ export async function translate({ settings, input, onChunk = () => {}, onReasoni
     });
   }
 
-  const body = buildBody(settings, input);
+  const body = buildBody(settings, input, prompt);
   const model = body.model;
 
   return withRequest(

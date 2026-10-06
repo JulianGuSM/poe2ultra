@@ -5,8 +5,8 @@ import { translate as chat } from './vendor/deepseek.js';
 import { translate as responses } from './vendor/responses.js';
 import { loadGlossary } from './vendor/glossary.js';
 import { collectContext } from './context.js';
-import { BATCH_RULE, parseBatch } from './protocol';
-import { POE2_GUIDE_CONTEXT } from './guide-context';
+import { parseBatch } from './protocol';
+import { buildGuidePrompt } from './guide-prompt.js';
 
 export { defaultSettings } from './settings';
 
@@ -21,7 +21,6 @@ export async function translateBatch(batch, configured, signal, report = () => {
   else extra.text = { format: { type: 'json_object' } };
   const settings = { ...DEFAULTS, ...configured, dualOutput: false, customBody: JSON.stringify(extra),
     targetLang: '简中与繁中两套独立译文（JSON 对象）',
-    systemPrompt: [configured.systemPrompt, POE2_GUIDE_CONTEXT, BATCH_RULE].join('\n\n'),
   };
   const warnings = [];
   report({ stage: 'glossary' });
@@ -54,8 +53,9 @@ export async function translateBatch(batch, configured, signal, report = () => {
   signal.throwIfAborted();
   const input = { text: JSON.stringify({ segments: missing.map((s, id) => ({ id, text: s.texts.join('') })) }),
     title: 'Path of Exile 2 build guide', url: '', pageLang: 'en', ...context };
+  const prompt = buildGuidePrompt(missing.map((s, id) => ({ id, text: s.texts.join('') })), context);
   report({ stage: 'requesting' });
-  await debug?.data('modelInput', { input, warnings });
+  await debug?.data('modelInput', { input, prompt, warnings });
   let receivedChars = 0, lastUpdate = 0, lastStage = '';
   const streamActivity = stage => {
     const now = Date.now();
@@ -64,7 +64,7 @@ export async function translateBatch(batch, configured, signal, report = () => {
       report({ stage, receivedChars });
     }
   };
-  const response = await (settings.apiMode === 'chat' ? chat : responses)({ settings, input, signal, debug,
+  const response = await (settings.apiMode === 'chat' ? chat : responses)({ settings, input, signal, debug, prompt,
     onChunk: chunk => { debug?.chunk('text', chunk); receivedChars += chunk.length; streamActivity('receiving'); },
     onReasoning: chunk => { debug?.chunk('reasoning', chunk); streamActivity('reasoning'); },
   });

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { translateBatch, defaultSettings } from './provider.js';
 import type { Segment } from './plan';
+import { GUIDE_SYSTEM_PROMPT } from './guide-prompt.js';
 
 const mocks = vi.hoisted(() => ({ translate: vi.fn(), glossary: vi.fn() }));
 vi.mock('./vendor/glossary.js', async importOriginal => {
@@ -34,12 +35,12 @@ describe('existing translator integration', () => {
     expect(request.input.terms[0].zh_cn).toBe('深渊巫妖');
     expect(request.input.terms[0].zh_tw).toBe('深淵妖巫');
     const client = await import('./vendor/deepseek.js');
-    const body = client.buildBody(request.settings, request.input);
+    const body = client.buildBody(request.settings, request.input, request.prompt);
     expect(body.messages.at(-1).content).toContain('深淵妖巫');
     expect(body.messages.at(-1).content).toContain('深渊巫妖');
-    expect(body.messages[0].content).toContain('JSON');
+    expect(body.messages[0].content).toBe(GUIDE_SYSTEM_PROMPT);
     const modeClient = await import(apiMode === 'chat' ? './vendor/deepseek.js' : './vendor/responses.js');
-    const actual = modeClient.buildBody(request.settings, request.input);
+    const actual = modeClient.buildBody(request.settings, request.input, request.prompt);
     if (apiMode === 'chat') expect(actual.response_format).toEqual({ type: 'json_object' });
     else expect(actual.text).toEqual({ format: { type: 'json_object' } });
   });
@@ -76,23 +77,24 @@ describe('existing translator integration', () => {
     const request = mocks.translate.mock.calls[0]![0];
     expect(request.settings).toMatchObject({ baseUrl: 'https://proxy.example/v1', stream: false, temperature: .5, maxTokens: 9000, timeoutMs: 60000, glossaryMaxTerms: 40 });
     expect(JSON.parse(request.settings.customBody)).toEqual({ top_p: .9, text: { format: { type: 'json_object' } } });
-    expect(request.settings.systemPrompt).toContain('Return every input id exactly once');
+    expect(request.prompt.systemText).toBe(GUIDE_SYSTEM_PROMPT);
   });
   it('reports malformed output once without automatically charging for a retry', async () => {
     mocks.translate.mockResolvedValue({ text: '{"translations":', finishReason: 'stop' });
     await expect(translateBatch([prose], settings, signal())).rejects.toThrow(/没有完整闭合[\s\S]*返回开头/);
     expect(mocks.translate).toHaveBeenCalledTimes(1);
   });
-  it('adds POE2 localization expertise even with an existing user prompt, without changing saved settings', async () => {
+  it('ignores selection prompts for guide requests without changing saved settings', async () => {
     mocks.translate.mockResolvedValue({ text: '{"translations":[{"id":0,"cn":["译文"],"tw":["譯文"]}]}', finishReason: 'stop' });
     const configured = { ...settings, systemPrompt: 'My saved translation preferences.' };
     await translateBatch([prose], configured, signal());
-    const prompt = mocks.translate.mock.calls[0]![0].settings.systemPrompt;
+    const prompt = mocks.translate.mock.calls[0]![0].prompt.systemText;
     expect(prompt).toContain('POE2');
     expect(prompt).toContain('游戏本地化');
     expect(prompt).toContain('0.5 版本');
     expect(prompt).toContain('6K');
-    expect(prompt).toContain('My saved translation preferences.');
+    expect(prompt).toBe(GUIDE_SYSTEM_PROMPT);
+    expect(prompt).not.toContain('My saved translation preferences.');
     expect(configured.systemPrompt).toBe('My saved translation preferences.');
   });
 });

@@ -3,7 +3,7 @@ import { PersistentCache } from '@/lib/translation/cache';
 import { digest, TranslationEngine } from '@/lib/translation/engine';
 import { validateSegments } from '@/lib/translation/protocol';
 import { translateBatch } from '@/lib/translation/provider.js';
-import { getSettings, saveSettings, requireEndpointPermission } from '@/lib/translation/preferences';
+import { getSettings, saveSettings, requireEndpointPermission, guideCachePrompts } from '@/lib/translation/preferences';
 import { translationProfile } from '@/lib/translation/profile';
 import { glossarySnapshot } from '@/lib/translation/glossary-snapshot';
 import { OVERRIDE_KEY } from '@/lib/translation/vendor/glossary.js';
@@ -67,7 +67,7 @@ export default defineBackground(() => {
         const { apiKey, tavilyApiKey, extraHeaders, timeoutMs, stream } = configured;
         const stored = await browser.storage.local.get(OVERRIDE_KEY);
         const override = stored[OVERRIDE_KEY] as { entries?: unknown[]; meta?: object } | undefined;
-        const profile = await translationProfile(configured, override);
+        const profile = await translationProfile(configured, override, await guideCachePrompts());
         const engineKey = await digest(JSON.stringify({ profile, apiKey, tavilyApiKey, extraHeaders, timeoutMs, stream }));
         let engine = engines.get(engineKey);
         if (!engine) {

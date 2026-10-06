@@ -33,4 +33,13 @@ describe('richTextSummary', () => {
     expect(richTextSummary(null)).toBeNull();
     expect(richTextSummary(doc(paragraph(text('   '))))).toBeNull();
   });
+
+  it('skips decorative separators and empty list items to find actual prose', () => {
+    expect(richTextSummary(doc(paragraph(text('-'.repeat(200))), paragraph(text('=== *** ___')), paragraph(text('Build for Patch 0.5.5.'))))).toBe('Build for Patch 0.5.5.');
+    expect(richTextSummary(doc({ type: 'list', children: [
+      { type: 'listitem', children: [text('---')] },
+      { type: 'listitem', children: [text('使用能量护盾防御。')] },
+    ] }))).toBe('使用能量护盾防御。');
+    expect(richTextSummary(doc(paragraph(text('──── ✦ ────'))))).toBeNull();
+  });
 });
