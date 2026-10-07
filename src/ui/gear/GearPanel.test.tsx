@@ -172,6 +172,33 @@ describe('GearPanel', () => {
     expect(tooltip.textContent).toContain('Socketable');
   });
 
+  it.each(['click', 'Enter', ' '] as const)('opens weapon rune details with %s while the weapon details are open', (action) => {
+    const rune = {
+      slug: 'rune-of-renown', name: 'Rune of Renown', iconUrl: 'https://cdn/rune.webp',
+      effects: ['Gloves: 50% increased Glory generation', 'Caster Weapon: Archon recovery period expires 30% faster'],
+    };
+    renderPanel({
+      ...ENDGAME,
+      equipment: ENDGAME.equipment.map(slot => slot.slot === 'mainHand' ? { ...slot, socketables: [rune] } : slot),
+    });
+    const weapon = slotCard('Weapon');
+    const itemTrigger = weapon.closest('.tooltip-trigger')!;
+    const runeIcon = within(weapon).getByAltText(rune.name);
+    const runeTrigger = runeIcon.closest('.tooltip-trigger')!;
+
+    fireEvent.click(weapon.querySelector('.item-name')!);
+    expect(itemTrigger.getAttribute('aria-expanded')).toBe('true');
+    if (action === 'click') fireEvent.click(runeIcon);
+    else fireEvent.keyDown(runeTrigger, { key: action });
+
+    const tooltip = screen.getByRole('dialog', { name: rune.name });
+    for (const effect of rune.effects) expect(tooltip.textContent).toContain(effect);
+    expect(itemTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(runeTrigger.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(runeIcon);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('lists the upgrade priority in order, with tooltips', () => {
     renderPanel();
 

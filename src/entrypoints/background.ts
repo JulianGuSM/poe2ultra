@@ -11,6 +11,7 @@ import { normalizeSettings, SETTINGS_KEY, validateSettings } from '@/lib/transla
 import { glossarySnapshot } from '@/lib/translation/glossary-snapshot';
 import { OVERRIDE_KEY } from '@/lib/translation/vendor/glossary.js';
 import { registerSelection } from '@/lib/selection/background.js';
+import { registerTradeLinks } from '@/lib/trade/background';
 import type { Segment } from '@/lib/translation/plan';
 import { getBuildSlug, isBuildPageUrl } from '@/lib/build-url';
 import { DebugSession, DebugStore } from '@/lib/translation/debug';
@@ -26,6 +27,7 @@ const errorText = (e: unknown) => e instanceof Error ? e.message + ((e as Error 
 
 export default defineBackground(() => {
   registerSelection();
+  registerTradeLinks();
   browser.action.onClicked.addListener(() => { void browser.runtime.openOptionsPage(); });
   browser.runtime.onMessage.addListener((message, sender, respond) => {
     if (!['translation-settings', 'translation-debug', 'translation-cache'].includes(message?.type)) return;

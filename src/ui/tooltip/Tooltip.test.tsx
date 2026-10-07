@@ -169,7 +169,7 @@ describe('WithTooltip', () => {
     expect([style.left, style.top]).toEqual(['100px', '128px']);
   });
 
-  it('keeps the pinned card when another trigger is clicked, then allows the nested trigger after closing', () => {
+  it('keeps the pinned card on hover and switches to a nested trigger on click', () => {
     const rune = { ...MODEL, title: 'Idol of Egrin', subtitle: 'Socketable' };
     render(
       <TooltipProvider>
@@ -187,12 +187,10 @@ describe('WithTooltip', () => {
     expect(title()).toBe("Atziri's Disdain");
 
     const runeImage = screen.getByAltText('rune');
-    fireEvent.click(runeImage);
+    fireEvent.pointerOver(runeImage);
     expect(title()).toBe("Atziri's Disdain");
-    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
     fireEvent.click(runeImage);
     expect(title()).toBe('Idol of Egrin');
-    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
 
     fireEvent.click(screen.getByText('Item card'));
     expect(title()).toBe("Atziri's Disdain");

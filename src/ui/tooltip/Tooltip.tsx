@@ -19,7 +19,7 @@ interface TooltipApi {
 
 const TooltipContext = createContext<TooltipApi | null>(null);
 
-/** One persistent, non-modal detail card; another hover cannot replace it until dismissed. */
+/** One persistent, non-modal detail card; explicit activation switches its content, hover does not. */
 export function TooltipProvider({ children, resetKey }: { children: ComponentChildren; resetKey?: string }) {
   const [open, setOpen] = useState<{ anchor: HTMLElement; model: TooltipModel } | null>(null);
   const close = useCallback((anchor?: HTMLElement) => setOpen(current => (!anchor || current?.anchor === anchor ? null : current)), []);
@@ -27,7 +27,7 @@ export function TooltipProvider({ children, resetKey }: { children: ComponentChi
 
   const api = useMemo<TooltipApi>(
     () => ({
-      open: (anchor, model) => setOpen(current => current ?? { anchor, model }),
+      open: (anchor, model) => setOpen({ anchor, model }),
       close,
       openAnchor: open?.anchor ?? null,
     }),
@@ -74,7 +74,7 @@ export function WithTooltip({ model, children, openOnChildClick = false }: {
 
   if (!model || !api) return <>{children}</>;
 
-  const show = () => ref.current && !api.openAnchor && api.open(ref.current, model);
+  const show = () => ref.current && api.open(ref.current, model);
   const isOpen = api.openAnchor !== null && api.openAnchor === ref.current;
 
   return (
@@ -87,13 +87,13 @@ export function WithTooltip({ model, children, openOnChildClick = false }: {
       aria-expanded={isOpen}
       aria-controls={isOpen ? TOOLTIP_ID : undefined}
       onClick={(event) => {
-        // Only the innermost trigger opens a new card; an already pinned card keeps ownership.
+        // Only the innermost trigger handles activation, so a rune opens its own details.
         const owner = (event.target as Element).closest('.tooltip-trigger');
         if (owner !== ref.current) return;
         if (!openOnChildClick && (event.target as Element).closest('button, a, input, select, textarea')) return;
         if (isOpen) {
           api.close();
-        } else if (!api.openAnchor) {
+        } else {
           show();
         }
       }}
@@ -104,7 +104,7 @@ export function WithTooltip({ model, children, openOnChildClick = false }: {
           event.preventDefault();
           if (isOpen) {
             api.close();
-          } else if (!api.openAnchor) {
+          } else {
             show();
           }
         } else if (event.key === 'Escape') {

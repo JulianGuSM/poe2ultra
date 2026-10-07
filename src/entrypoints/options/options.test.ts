@@ -19,10 +19,13 @@ it('loads the original Chinese form with existing settings and saves all advance
   expect((document.getElementById('apiKey') as HTMLInputElement).value).toBe('existing-test-key');
   expect(document.querySelector('h1')!.textContent).toBe('poe2ultra 翻译设置');
   expect((document.getElementById('glossaryMaxTerms') as HTMLInputElement).value).toBe('80');
+  expect((document.getElementById('chinaTradeLeague') as HTMLInputElement).value).toBe('周年庆巅峰挑战');
+  fireEvent.input(document.getElementById('chinaTradeLeague')!, { target: { value: '测试国服赛季' } });
   fireEvent.input(document.getElementById('baseUrl')!, { target: { value: 'https://proxy.example/v1' } });
   fireEvent.input(document.getElementById('panelWidth')!, { target: { value: '520' } });
   fireEvent.input(document.getElementById('extraHeaders')!, { target: { value: '{"X-Test":"value"}' } });
   fireEvent.click(document.getElementById('btn-save')!);
   await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'save-settings', patch: expect.objectContaining({ baseUrl: 'https://proxy.example/v1', panelWidth: 520, extraHeaders: '{"X-Test":"value"}', showButton: true, dualOutput: true, maxTokens: 16384 }) })));
+  expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'save-settings', patch: expect.objectContaining({ chinaTradeLeague: '测试国服赛季' }) }));
   expect(sendMessage.mock.calls.some(([message]) => message.type === 'test-connection')).toBe(false);
 });

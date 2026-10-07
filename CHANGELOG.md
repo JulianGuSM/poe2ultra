@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 1.7.3
+
+- Rebuild Simplified Chinese equipment trade links as `/trade2/search/poe2/<league>/<gzip-base64url query>` instead of replacing only the international site's hostname. Convert item names and supplied bases with the bundled/imported Simplified Chinese terminology while preserving rarity, stat IDs, numeric thresholds and other query filters.
+- Match the verified Evergrasping Ring search with 永恒紧缩之戒 and 珠玉戒指. Add an editable China trade league in settings, defaulting to 周年庆巅峰挑战; English and Traditional Chinese retain the original links.
+- Report missing name mappings or conversion errors on the trade icon instead of opening an empty search. Refresh links after league or glossary changes without requesting AI translations.
+
+## 1.7.2
+
+- Fix weapon rune details being blocked by an already open equipment detail card. Clicking or pressing Enter/Space on another detail trigger now switches the card; hover leaves it pinned and activating the same trigger again closes it.
+
+## 1.7.1
+
+- Use the China realm trade site (poe.game.qq.com/trade2) for equipment searches in Simplified Chinese, preserving the search path and query parameters. English and Traditional Chinese keep the international trade site.
+
+## 1.7.0
+
+- Let the site's tree receive Control keydown/keyup when guide navigation retains keyboard focus, restoring Ctrl+wheel after switching away from and back to tree tabs while keeping other guide keyboard events isolated.
+- Keep browser page zoom suppressed within passive and atlas tree regions while forwarding Control key state; other guide shortcuts and text input remain isolated from the site.
+
 ## 1.6.7
 
 - Restore per-line ellipsis for the original and translated build title so long bilingual headings do not stretch the narrow header.

@@ -8,6 +8,8 @@ import { Icon } from '@/ui/common/Icon';
 import { RichText } from '@/ui/rich-text/RichText';
 import { entityChipRenderer } from '@/ui/tooltip/EntityTooltipChip';
 import { WithTooltip } from '@/ui/tooltip/Tooltip';
+import type { TradeLinkResult } from '@/lib/trade/china';
+import { useTradeLinks } from './useTradeLinks';
 
 const EMPTY = "The author hasn't listed gear for this variant.";
 
@@ -17,6 +19,7 @@ const GRANTS_SHOWN = 2;
 export function GearPanel({ variant, entities }: { variant: Variant; entities: Record<string, EntityInfo> }) {
   const renderEntity = useMemo(() => entityChipRenderer(entities), [entities]);
   const hasEquipment = variant.equipment.length > 0;
+  const tradeLink = useTradeLinks(variant.equipment);
 
   if (!hasEquipment && !variant.equipmentNotes) {
     return <p class="panel-empty">{EMPTY}</p>;
@@ -32,12 +35,12 @@ export function GearPanel({ variant, entities }: { variant: Variant; entities: R
           <section class="card gear__slots" aria-label="Equipment">
             <div class="gear__armour">
               {armour.map((s) => (
-                <ItemSlotCard key={key(s)} sheetSlot={s} size="large" />
+                <ItemSlotCard key={key(s)} sheetSlot={s} size="large" tradeLink={tradeLink} />
               ))}
             </div>
             <div class="gear__other">
               {other.map((s) => (
-                <ItemSlotCard key={key(s)} sheetSlot={s} size="compact" />
+                <ItemSlotCard key={key(s)} sheetSlot={s} size="compact" tradeLink={tradeLink} />
               ))}
             </div>
           </section>
@@ -56,7 +59,7 @@ export function GearPanel({ variant, entities }: { variant: Variant; entities: R
   );
 }
 
-function ItemSlotCard({ sheetSlot, size }: { sheetSlot: SheetSlot; size: 'large' | 'compact' }) {
+function ItemSlotCard({ sheetSlot, size, tradeLink }: { sheetSlot: SheetSlot; size: 'large' | 'compact'; tradeLink: (source: string) => TradeLinkResult }) {
   const label = slotLabel(sheetSlot.slot, sheetSlot.weaponSet);
   if (!sheetSlot.equipped) {
     return (
@@ -71,6 +74,7 @@ function ItemSlotCard({ sheetSlot, size }: { sheetSlot: SheetSlot; size: 'large'
   }
 
   const { item, socketables } = sheetSlot.equipped;
+  const trade = item.tradeUrl ? tradeLink(item.tradeUrl) : null;
   return (
     <WithTooltip model={itemTooltip(item, socketables)}>
       <div class={`item-slot item-slot--${size}`}>
@@ -79,11 +83,13 @@ function ItemSlotCard({ sheetSlot, size }: { sheetSlot: SheetSlot; size: 'large'
           {item.tradeUrl && (
             <a
               class="item-slot__trade"
-              href={item.tradeUrl}
+              href={trade?.url}
+              role="link"
+              aria-disabled={!trade?.url}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Find ${item.name} on the trade site`}
-              title="Find on the official trade site"
+              title={trade?.error ?? 'Find on the official trade site'}
               onClick={(event) => event.stopPropagation()}
             >
               <Scale size={12} aria-hidden="true" />

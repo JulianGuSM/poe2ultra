@@ -21,7 +21,7 @@ const CHECKBOXES = [
 ];
 const TEXTS = [
   'apiKey', 'baseUrl', 'model', 'targetLang', 'systemPrompt', 'userPrompt',
-  'extraHeaders', 'customBody',
+  'extraHeaders', 'customBody', 'chinaTradeLeague',
   'glossaryCategories', 'tavilyApiKey', 'tavilyDomains', 'poe2dbLocales',
 ];
 const NUMBERS = [

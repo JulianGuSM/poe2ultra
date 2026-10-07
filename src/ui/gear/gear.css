@@ -279,6 +279,11 @@
   color: var(--accent);
 }
 
+.item-slot__trade[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: help;
+}
+
 .item-slot__sockets {
   display: flex;
   flex: none;
