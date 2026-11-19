@@ -21,6 +21,7 @@ export const segmentKey = (segment: Segment) => JSON.stringify(segment);
 const TEXT_FIELDS = new Set(['title', 'name', 'className', 'ascendancy', 'parentName', 'itemClassName',
   'description', 'flavourText', 'act', 'area', 'reward', 'label', 'value']);
 const TEXT_ARRAYS = new Set(['modifiers', 'implicits', 'effects', 'qualityEffects', 'tags', 'buildTypes']);
+const FIXED_NUMERIC_STATS = new Set(['critical strike chance', 'mana range']);
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const translatable = (text: string) => /[a-z]/i.test(text) && !/^\s*(https?:\/\/|www\.)\S+\s*$/i.test(text);
 
@@ -66,8 +67,9 @@ export function planTranslation(build: Build): TranslationPlan {
       if ('root' in value) rich(value.root, [...path, 'root']);
       else {
         const isCastTimeStat = value.name === 'Cast Time';
+        const isFixedNumericStat = typeof value.name === 'string' && FIXED_NUMERIC_STATS.has(value.name.toLowerCase());
         Object.entries(value).forEach(([key, child]) => {
-          if (isCastTimeStat && key === 'value') return;
+          if ((isCastTimeStat && key === 'value') || (isFixedNumericStat && ['name', 'value'].includes(key))) return;
           walk(child, [...path, key], key);
         });
       }

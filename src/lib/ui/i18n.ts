@@ -33,6 +33,8 @@ const LABELS: Record<string, [cn: string, tw: string]> = {
   'Level': ['等级', '等級'],
   'Cast Time': ['施法时间', '施法時間'],
   'Mana Cost': ['魔力消耗', '魔力消耗'],
+  'Mana Range': ['魔力消耗', '魔力消耗'],
+  'Critical Strike Chance': ['暴击几率', '暴擊機率'],
   'Reservation': ['保留', '保留'],
   'Strength': ['力量', '力量'],
   'Dexterity': ['敏捷', '敏捷'],

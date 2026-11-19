@@ -309,7 +309,9 @@ function TooltipCard({ model }: { model: TooltipModel }) {
           {model.stats.map(({ name, value }) => (
             <div key={name}>
               <dt>{uiText(name, locale) === name ? <BilingualText text={name} /> : uiText(name, locale)}</dt>
-                <dd><BilingualText text={name.toLowerCase() === 'reservation' ? `${value}${locale === 'en' ? ' Spirit' : '精魂'}` : value} /></dd>
+                <dd>{['critical strike chance', 'mana range'].includes(name.toLowerCase())
+                  ? value
+                  : <BilingualText text={name.toLowerCase() === 'reservation' ? `${value}${locale === 'en' ? ' Spirit' : '精魂'}` : value} />}</dd>
             </div>
           ))}
         </dl>
