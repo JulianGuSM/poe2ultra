@@ -66,3 +66,9 @@ npm run zip:store
 - [上游项目说明](docs/UPSTREAM-README.md)
 
 poe2ultra 基于 [ReSenpai/poe2perfect](https://github.com/ReSenpai/poe2perfect)，并包含翻译组件和术语数据。版权归属和许可证信息见[项目声明](NOTICE)。
+
+## 赞赏支持
+
+如果 poe2ultra 对你有帮助，欢迎扫码赞赏。感谢支持！
+
+![Julian 的赞赏码](docs/images/donation.png)
