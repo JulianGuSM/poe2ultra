@@ -224,6 +224,10 @@
   line-height: 16px;
 }
 
+.passives__priority .passive-row__effect {
+  display: none;
+}
+
 /* Key passives / author's notes switch in the side panel heading. */
 .side-tabs {
   display: flex;
