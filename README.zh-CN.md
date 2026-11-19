@@ -60,7 +60,6 @@ npm run zip
 ## 更多信息
 
 - [English README](README.md)
-- [攻略全文翻译详细说明](docs/TRANSLATION.zh-CN.md)
 - [更新日志](CHANGELOG.md)
 - [隐私声明](PRIVACY.md)
 - [许可证](LICENSE)

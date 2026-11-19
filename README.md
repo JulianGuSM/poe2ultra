@@ -60,7 +60,6 @@ Packages are written under `.output/releases`. To rebuild the bundled terminolog
 ## More information
 
 - [简体中文说明](README.zh-CN.md)
-- [Detailed guide translation guide (Chinese)](docs/TRANSLATION.zh-CN.md)
 - [Changelog](CHANGELOG.md)
 - [Privacy Notice](PRIVACY.md)
 - [License](LICENSE)
