@@ -71,4 +71,4 @@ poe2ultra 基于 [ReSenpai/poe2perfect](https://github.com/ReSenpai/poe2perfect)
 
 如果 poe2ultra 对你有帮助，欢迎扫码赞赏。感谢支持！
 
-![Julian 的赞赏码](docs/images/donation.png)
+<img src="docs/images/donation.png" alt="Julian 的赞赏码" width="320">

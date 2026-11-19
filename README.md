@@ -71,4 +71,4 @@ poe2ultra is based on [ReSenpai/poe2perfect](https://github.com/ReSenpai/poe2per
 
 If poe2ultra has been useful, you can scan the code below to support the project. Thank you!
 
-![Julian's donation QR code](docs/images/donation.png)
+<img src="docs/images/donation.png" alt="Julian's donation QR code" width="320">
