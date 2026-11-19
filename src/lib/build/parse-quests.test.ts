@@ -19,6 +19,7 @@ describe('parseQuestRewards', () => {
       area: 'Valley of the Titans',
       reward: '30% increased Charm Charges gained, +1 Charm Slot',
       isChoice: true,
+      categories: ['choices'],
     });
   });
 

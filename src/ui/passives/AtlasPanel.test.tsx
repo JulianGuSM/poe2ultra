@@ -20,7 +20,7 @@ function renderPanel(variant: Variant = LOW_LIFE, variantIndex = LOW_LIFE_INDEX)
   const calls: Parameters<EmbedTree>[0][] = [];
   const embedTree: EmbedTree = (options) => {
     calls.push(options);
-    return { setVariant: vi.fn(), sync: vi.fn(), destroy: vi.fn() };
+    return { setVariant: vi.fn(), setActive: vi.fn(), setPassiveCandidates: vi.fn(), sync: vi.fn(), destroy: vi.fn() };
   };
   render(
     <TooltipProvider>

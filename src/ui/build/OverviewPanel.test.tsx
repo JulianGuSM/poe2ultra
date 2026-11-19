@@ -29,6 +29,21 @@ describe('OverviewPanel', () => {
     expect(sections.textContent).toContain(textNodes(BUILD.sections[0]!.content)[0]);
   });
 
+  it('collapses and expands each guide text section from its header', () => {
+    renderPanel();
+
+    const firstText = textNodes(BUILD.sections[0]!.content)[0]!;
+    const toggle = screen.getByRole('button', { name: /^Build Overview/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText(firstText)).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText(firstText)).toBeTruthy();
+  });
+
   it('lists strengths and weaknesses first in the glance card, not as cards of their own', () => {
     const { container } = renderPanel();
 
@@ -118,29 +133,29 @@ describe('OverviewPanel', () => {
     expect(onGlanceCollapsedChange).toHaveBeenCalledWith(true);
   });
 
-  it('shows a collapsed At a Glance as a slim rail that expands again', () => {
-    const { container, onGlanceCollapsedChange } = renderPanel(BUILD, true);
+  it('shows a collapsed At a Glance as an accordion header that expands again', () => {
+    const { onGlanceCollapsedChange } = renderPanel(BUILD, true);
 
-    expect(container.querySelector('.overview')?.classList.contains('overview--glance-collapsed')).toBe(true);
+    const toggle = within(glance()).getByRole('button', { name: 'Expand At a Glance' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(glance().querySelector('.glance__group')).toBeNull();
+    fireEvent.click(toggle);
+
+    expect(onGlanceCollapsedChange).toHaveBeenCalledWith(false);
+  });
+
+  it('expands At a Glance from its accordion header', () => {
+    const { onGlanceCollapsedChange } = renderPanel(BUILD, true);
+
     fireEvent.click(within(glance()).getByRole('button', { name: 'Expand At a Glance' }));
 
     expect(onGlanceCollapsedChange).toHaveBeenCalledWith(false);
   });
 
-  it('expands from anywhere on the collapsed rail, not just the icon', () => {
-    const { onGlanceCollapsedChange } = renderPanel(BUILD, true);
-
-    fireEvent.click(glance().querySelector('.glance__rail-title')!);
-
-    expect(onGlanceCollapsedChange).toHaveBeenCalledWith(false);
-  });
-
-  it('keeps the expanded card clickable only on its icon', () => {
+  it('does not collapse At a Glance when clicking its body', () => {
     const { onGlanceCollapsedChange } = renderPanel(BUILD, false);
 
-    fireEvent.click(glance().querySelector('.card__title')!);
-    fireEvent.click(glance());
+    fireEvent.click(glance().querySelector('.glance__body .glance__group')!);
 
     expect(onGlanceCollapsedChange).not.toHaveBeenCalled();
   });

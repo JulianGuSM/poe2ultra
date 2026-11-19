@@ -3,6 +3,14 @@ import type { Locale } from '@/lib/translation/plan';
 /** Extension-owned labels only. Guide prose and game data still use the translation cache. */
 const LABELS: Record<string, [cn: string, tw: string]> = {
   'Overview': ['总览', '總覽'],
+  'Build Overview': ['构筑概览', '構築概覽'],
+  'How it Plays': ['玩法详情', '玩法詳情'],
+  'How it Works': ['机制原理', '機制原理'],
+  'Changelog': ['更新日志', '更新日誌'],
+  'Change Log': ['更新日志', '更新日誌'],
+  'Strengths and Weaknesses': ['优势与劣势', '優勢與劣勢'],
+  'Strengths': ['优势', '優勢'],
+  'Weaknesses': ['劣势', '劣勢'],
   'Skills': ['技能', '技能'],
   'Gear': ['装备', '裝備'],
   'Passives': ['天赋', '天賦'],
@@ -23,6 +31,9 @@ const LABELS: Record<string, [cn: string, tw: string]> = {
   'Socketable': ['可镶嵌物', '可鑲嵌物'],
   'Requires': ['需求', '需求'],
   'Level': ['等级', '等級'],
+  'Cast Time': ['施法时间', '施法時間'],
+  'Mana Cost': ['魔力消耗', '魔力消耗'],
+  'Reservation': ['保留', '保留'],
   'Strength': ['力量', '力量'],
   'Dexterity': ['敏捷', '敏捷'],
   'Intelligence': ['智慧', '智慧'],
@@ -31,12 +42,26 @@ const LABELS: Record<string, [cn: string, tw: string]> = {
   'Close details': ['关闭详情', '關閉詳情'],
   'Active Skills': ['主动技能', '主動技能'],
   'Gem Priority': ['宝石优先顺序', '寶石優先順序'],
+  'Passive Priority': ['天赋优先级', '天賦優先級'],
+  'Notes': ['备注', '備註'],
   "Author's Notes": ['作者备注', '作者備註'],
+  'Quest Rewards': ['任务奖励', '任務獎勵'],
+  'Choices': ['可选奖励', '可選獎勵'],
+  'Skill Points': ['技能点', '技能點'],
+  'Character Upgrades': ['角色升级', '角色升級'],
+  'All': ['全部', '全部'],
 };
 
 export function uiText(label: string, locale: Locale): string {
-  const translation = LABELS[label];
-  return locale === 'en' || !translation ? label : translation[locale === 'cn' ? 0 : 1];
+  return uiTextIfKnown(label, locale) ?? label;
+}
+
+/** Localize a fixed UI label without sending it through guide translation; null means it is author text. */
+export function uiTextIfKnown(label: string, locale: Locale): string | null {
+  const key = Object.keys(LABELS).find((candidate) => candidate.toLowerCase() === label.trim().toLowerCase());
+  if (!key) return null;
+  const translation = LABELS[key];
+  return locale === 'en' ? key : translation[locale === 'cn' ? 0 : 1];
 }
 
 export function uiRequirements(requirements: string, locale: Locale): string {

@@ -7,23 +7,20 @@
 
 .build-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(200px, 380px);
-  gap: 24px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
-  padding: 20px 24px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--border);
 }
 
 .build-header__art {
-  width: 96px;
-  height: 96px;
+  box-sizing: border-box;
+  width: 70px;
+  height: 70px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   object-fit: cover;
-}
-
-.build-header--no-summary {
-  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .build-header__identity {
@@ -38,18 +35,31 @@
   line-height: 32px;
 }
 
-.build-header__title-original,
-.build-header__title > .translation-text {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.build-header__title .bilingual-text--inline {
+  display: inline;
+  max-width: 100%;
+  white-space: normal;
 }
 
-.build-header__title > .translation-text {
-  margin: 2px 0 0;
-  line-height: 1.35;
+.build-header__title .bilingual-text--inline > .translation-text {
+  display: inline;
+  margin: 0 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.86em;
+  font-weight: 400;
+  line-height: inherit;
+  white-space: normal;
+}
+
+.build-header__title .bilingual-text--inline > .translation-text-row {
+  display: inline-flex;
+  margin: 0 0 0 8px;
+  vertical-align: baseline;
+}
+
+.build-header__title .bilingual-text--inline > .translation-text-row > .translation-text {
+  display: inline;
+  margin: 0;
 }
 
 .build-header__hero {
@@ -73,6 +83,27 @@
   overflow-wrap: anywhere;
 }
 
+.build-header__hero .bilingual-text--inline > .translation-text {
+  display: inline;
+  margin: 0 0 0 6px;
+  color: var(--text-muted);
+  font-size: 0.86em;
+  font-weight: 400;
+  line-height: inherit;
+  white-space: normal;
+}
+
+.build-header__hero .bilingual-text--inline > .translation-text-row {
+  display: inline-flex;
+  margin: 0 0 0 6px;
+  vertical-align: baseline;
+}
+
+.build-header__hero .bilingual-text--inline > .translation-text-row > .translation-text {
+  display: inline;
+  margin: 0;
+}
+
 .build-header__separator,
 .build-header__ascendancy {
   color: var(--text-muted);
@@ -82,7 +113,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   padding: 0;
   list-style: none;
   color: var(--text-muted);
@@ -96,26 +127,31 @@
   align-items: center;
 }
 
-.build-header__summary {
-  grid-column: 3;
-  align-self: center;
-  min-width: 0;
-  margin: 0;
-  padding-left: 24px;
-  border-left: 1px solid var(--border);
-  overflow: hidden;
+.build-header__meta-label {
   color: var(--text-muted);
-  font-size: 13px;
-  font-style: italic;
-  line-height: 20px;
 }
 
-.build-header__excerpt {
-  display: -webkit-box;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+.build-header__video {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.build-header__video:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.build-header__video:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.build-header__video-host {
+  color: var(--text-muted);
 }
 
 .tab-bar {
@@ -244,23 +280,11 @@
   }
 }
 
-/* Main column (strengths/weaknesses, then guide texts) with the glance card beside it. */
-/* Guide texts beside At a Glance; both columns share their height, so neither leaves empty space below. */
+/* The primary build summary sits beside secondary guide cards on wide screens. */
 .overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: stretch;
-}
-
-.overview--glance-collapsed {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-@media (max-width: 1000px) {
-  .overview {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .overview .card {
@@ -268,76 +292,82 @@
 }
 
 .overview .card__title {
-  margin-bottom: 8px;
+  margin: 0;
   font-size: 15px;
   line-height: 20px;
 }
 
-.glance__strengths ul,
-.glance__weaknesses ul {
-  padding-left: 16px;
+.overview .overview__section-title {
+  margin: -12px -12px 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--surface-hover);
 }
 
-.glance__strengths li::marker {
-  color: var(--gem-dex);
-  content: '+  ';
-}
-
-.glance__weaknesses li::marker {
-  color: var(--gem-str);
-  content: '−  ';
-}
-
-/* Guide texts flow like a book: down the left column, then the right one. */
-/*
- * Guide texts two by two; cards in a row share its height, and an odd last one takes the whole row. A track is never
- * narrower than half the area, so a wide area (At a Glance collapsed) still gets two columns, never three.
- */
-.overview__texts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(max(420px, calc((100% - 12px) / 2)), 1fr));
+.overview__accordion-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
   gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.overview__accordion-trigger:hover {
+  color: var(--accent-strong);
+}
+
+.overview__accordion-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.overview__accordion-icon {
+  flex: none;
+  color: var(--text-muted);
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+
+.overview__section--collapsed .overview__accordion-icon {
+  transform: rotate(0deg);
+}
+
+.overview__section--collapsed .overview__section-title {
+  margin-bottom: -12px;
+  border-bottom-color: transparent;
+  border-radius: var(--radius-card);
+}
+
+.overview__accordion-label {
   min-width: 0;
 }
 
-.overview__texts > .card:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-}
-
-.glance {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-sizing: border-box;
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.glance p,
-.glance ul,
-.glance dl {
+.overview__accordion-label .bilingual-text--inline > .translation-text {
+  display: inline;
   margin: 0;
+  font-size: .86em;
+  white-space: normal;
 }
 
-.overview .glance .card__title {
-  margin-bottom: 0;
+.overview__section-content {
+  margin-top: 8px;
 }
 
+/* Shared by the collapsible Gear and Gem Priority sidebars. */
 .glance__header {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-}
-
-.glance__toggle {
-  margin: -4px -4px -4px 0;
-}
-
-/* Collapsed: a slim rail with the toggle on top and the title running down; the whole rail expands the card. */
-.glance--collapsed {
-  width: 44px;
-  padding: 0 !important;
 }
 
 .glance__rail {
@@ -376,14 +406,6 @@
 }
 
 @media (max-width: 1000px) {
-  .overview--glance-collapsed {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .glance--collapsed {
-    width: auto;
-  }
-
   .glance__rail {
     flex-direction: row-reverse;
     justify-content: space-between;
@@ -395,99 +417,38 @@
   }
 }
 
-.glance__based {
-  margin-top: -6px !important;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.glance__label {
-  margin-bottom: 4px !important;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.glance__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0;
-  list-style: none;
-}
-
-.glance__group .tooltip-trigger {
-  display: inline-flex;
-  max-width: 100%;
-}
-
-.glance__entry {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.overview__texts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
   min-width: 0;
 }
 
-.glance__icon {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  object-fit: contain;
-}
-
-.glance__icon--round {
-  border-radius: 50%;
-}
-
-.glance__name {
-  overflow: hidden;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.glance__meta {
+.overview__primary,
+.overview__side {
   display: flex;
-  gap: 16px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
-.glance__meta dt {
-  color: var(--text-muted);
-  font-size: 11px;
+@media (min-width: 1001px) {
+  .overview__texts--split {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    align-items: start;
+  }
 }
 
-.glance__meta dd {
-  margin: 0;
+.overview__strengths-weaknesses .overview__strengths + .overview__weaknesses {
+  margin-top: 12px;
 }
 
-.glance__video {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  align-self: flex-start;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.glance__video:hover {
-  color: var(--accent-strong);
-  text-decoration: underline;
-}
-
-.glance__video:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.glance__video-host {
+.overview__strengths-weaknesses h3 {
+  margin: 0 0 4px;
   color: var(--text-muted);
   font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
 }
 
 .card {
@@ -517,26 +478,12 @@
   cursor: help;
 }
 
-/* Keep the identity readable as the summary and the extra translation controls compete for space. */
+/* Keep the build identity compact while preserving readable metadata on smaller screens. */
 @media (max-width: 1100px) {
-  .build-header,
-  .build-header--no-summary {
-    grid-template-columns: 80px minmax(0, 1fr) minmax(180px, 30%);
+  .build-header {
+    grid-template-columns: 70px minmax(0, 1fr);
     gap: 16px;
-    padding: 16px;
-  }
-
-  .build-header--no-summary {
-    grid-template-columns: 80px minmax(0, 1fr);
-  }
-
-  .build-header__art {
-    width: 80px;
-    height: 80px;
-  }
-
-  .build-header__summary {
-    padding-left: 16px;
+    padding: 12px 16px;
   }
 
   .tab-bar {
@@ -550,18 +497,8 @@
 }
 
 @media (max-width: 900px) {
-  .build-header,
-  .build-header--no-summary {
-    grid-template-columns: 72px minmax(0, 1fr);
-  }
-
-  .build-header__art {
-    width: 72px;
-    height: 72px;
-  }
-
-  .build-header__summary {
-    display: none;
+  .build-header {
+    grid-template-columns: 70px minmax(0, 1fr);
   }
 
   .build-header__title {
@@ -576,16 +513,10 @@
 }
 
 @media (max-width: 600px) {
-  .build-header,
-  .build-header--no-summary {
-    grid-template-columns: 56px minmax(0, 1fr);
+  .build-header {
+    grid-template-columns: 70px minmax(0, 1fr);
     gap: 10px;
     padding: 12px;
-  }
-
-  .build-header__art {
-    width: 56px;
-    height: 56px;
   }
 
   .build-header__title {

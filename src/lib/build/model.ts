@@ -38,12 +38,16 @@ export interface QuestAct {
   quests: QuestReward[];
 }
 
+export type QuestRewardCategory = 'choices' | 'skill-points' | 'character-upgrades';
+
 export interface QuestReward {
   name: string;
   area: string | null;
   reward: string;
   /** The quest offers several rewards to pick from. */
   isChoice: boolean;
+  /** Native quest category tags, when available in the site's static quest data. */
+  categories: QuestRewardCategory[];
 }
 
 export interface TextSection {

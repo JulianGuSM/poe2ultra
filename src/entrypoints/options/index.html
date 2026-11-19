@@ -16,46 +16,68 @@
         <img src="/icon/48.png" alt="" width="36" height="36" />
         <div>
           <h1>poe2ultra 翻译设置</h1>
-          <p class="sub">攻略全文翻译 + 网页划词翻译 · 共用接口与术语设置</p>
+          <p class="sub">攻略全文翻译 + 网页划词翻译</p>
         </div>
       </div>
       <div class="top-right">
         <span id="save-state" class="save-state"></span>
-        <button id="btn-test" class="btn" type="button">测试连接</button>
         <button id="btn-save" class="btn primary" type="button">保存设置</button>
       </div>
     </header>
 
-    <div id="toast" class="toast" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+      <span class="toast-icon" aria-hidden="true">✓</span>
+      <span id="toast-message" class="toast-message"></span>
+      <span class="toast-progress" aria-hidden="true"></span>
+    </div>
 
-    <section class="card">
-      <h2>攻略全文翻译与缓存</h2>
-      <p class="desc">攻略页面点击“开始翻译”后，固定生成简中、繁中两套独立译文并长期缓存。下方“目标语言”和“双版本输出”仅控制划词翻译；面板外观和费用设置不会使攻略缓存失效。</p>
-      <p class="hint">设置会自动保存在本机，不同步到 Google 账号。修改模型、术语表或翻译参数后，使用对应的新缓存；恢复原配置仍可复用旧缓存。划词提示词独立生效，不影响全文翻译及其缓存。导入术语表时，正在运行的攻略任务使用启动时的术语表，下一次任务使用新表。</p>
-      <p id="guide-cache-state" class="hint">正在读取攻略缓存…</p>
-      <p class="hint">卸载扩展前请导出备份。备份包含简中、繁中译文、攻略费用估算记录、匹配缓存所需的翻译参数及导入术语表；不会自动加入 API Key 或额外请求头。自定义请求体会随翻译参数导出，请妥善保存备份。导入时保留现有译文与费用记录，并恢复备份中的翻译参数。</p>
-      <div class="card-actions">
-        <button id="btn-guide-cache-export" class="btn" type="button">导出译文缓存（JSON）</button>
-        <button id="btn-translations-csv-export" class="btn" type="button">导出累计译文（CSV）</button>
-        <button id="btn-guide-cache-import" class="btn" type="button">选择缓存备份</button>
-        <input id="guide-cache-file" type="file" accept=".json,application/json" hidden />
-        <button id="btn-guide-cache-clear" class="btn danger" type="button">清空攻略译文（保留费用记录）</button>
+    <dialog id="custom-term-dialog" class="custom-term-dialog" aria-labelledby="custom-term-dialog-title">
+      <div class="custom-term-dialog-head">
+        <div>
+          <h2 id="custom-term-dialog-title">添加自定义术语</h2>
+          <p id="custom-term-dialog-desc" class="desc">填写作者的非标准写法，再搜索并选择官方术语。</p>
+        </div>
+        <button id="btn-custom-term-close" class="btn tiny" type="button" aria-label="关闭">关闭</button>
       </div>
-      <p class="hint">CSV 汇总攻略全文翻译和已完成的双语划词翻译，仅包含英语原文、简中、繁中三列。每次导出会下载当前本机累计记录的完整快照；CSV 用于阅读和整理，重装后恢复缓存请用 JSON 备份。旧版攻略缓存会在重新打开对应攻略时补记原文，无需重新调用 API。</p>
-      <p id="guide-cache-import-preview" class="hint" role="status" hidden></p>
-      <button id="btn-guide-cache-import-confirm" class="btn primary" type="button" hidden>合并并恢复翻译参数</button>
-    </section>
+      <div id="custom-term-editor-fields">
+        <div class="field">
+          <label for="customTermModalAlias">作者口语化或非标准写法（alias）</label>
+          <input id="customTermModalAlias" type="text" placeholder="例如：Lesser Jewellers Orb" />
+        </div>
+        <div class="field">
+          <label for="customTermModalSearch">搜索官方术语简中名称</label>
+          <div class="custom-term-search-row">
+            <input id="customTermModalSearch" type="search" placeholder="输入简体中文，例如：珠宝工匠球" autocomplete="off" />
+            <button id="btn-custom-term-search" class="btn" type="button">搜索</button>
+          </div>
+          <div id="customTermModalResults" class="term-search-results" role="listbox" aria-label="官方术语搜索结果"></div>
+          <p id="customTermModalState" class="hint" role="status">输入简体中文后点击搜索。</p>
+        </div>
+      </div>
+      <div class="field">
+        <label>映射 JSON 预览</label>
+        <pre id="customTermModalJson" class="preview custom-term-json" hidden></pre>
+      </div>
+      <div class="custom-term-dialog-actions">
+        <button id="btn-custom-term-cancel" class="btn" type="button">取消</button>
+        <button id="btn-custom-term-save" class="btn primary" type="button" disabled>保存映射</button>
+      </div>
+    </dialog>
+
+    <div class="settings-tabs" role="tablist" aria-label="设置分类">
+      <button id="settings-tab-api" class="settings-tab" type="button" role="tab" aria-selected="true" aria-controls="settings-panel-api" tabindex="0" data-settings-tab="api">模型</button>
+      <button id="settings-tab-selection" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-selection" tabindex="-1" data-settings-tab="selection">划词翻译</button>
+      <button id="settings-tab-advanced" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-advanced" aria-describedby="advanced-settings-tooltip" tabindex="-1" data-settings-tab="advanced">高阶设置<span class="tooltip-help settings-tab-help"><span class="tooltip-help__trigger" aria-hidden="true">?</span><span id="advanced-settings-tooltip" class="tooltip-help__content" role="tooltip">术语表、联网补充和 Debug 日志属于高阶配置，建议熟悉插件后再开启。开启后才能编辑并应用。</span></span></button>
+    </div>
+
     <!-- 1. 接口 -->
+    <div id="settings-panel-api" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-api" data-settings-panel="api" tabindex="0">
     <section class="card">
-      <div class="card-head">
-        <h2>1 · 接口与模型</h2>
-        <p class="desc">
-          API Key 只保存在本机（<code>chrome.storage.local</code>），不会同步到 Google 账号。
-          在 <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">platform.deepseek.com</a> 创建。
-          “测试连接”会发送一小段样本文本，可能产生 API 费用。
-        </p>
+      <div class="card-titlebar">
+        <h2>API设置</h2>
+        <button id="btn-test" class="btn" type="button">测试连接</button>
       </div>
-
+      <div class="grid2">
       <div class="field">
         <label for="apiKey">API 密钥</label>
         <div class="row">
@@ -73,16 +95,9 @@
         <p class="hint">默认官方地址。填到 <code>/v1</code>、<code>/responses</code> 或完整端点都可以，脚本会按下面的 API 形态自动补全。使用自建中转时保存会请求该域名的访问授权。</p>
         <p class="hint" id="perm-state"></p>
       </div>
+      </div>
 
       <div class="grid2">
-        <div class="field">
-          <label for="apiMode">API 形态</label>
-          <select id="apiMode">
-            <option value="responses">Responses API（POST /responses）</option>
-            <option value="chat">Chat Completions（POST /chat/completions）</option>
-          </select>
-          <p class="hint" id="api-mode-state"></p>
-        </div>
         <div class="field">
           <label for="model">模型</label>
           <input id="model" type="text" list="model-presets" spellcheck="false" />
@@ -95,21 +110,18 @@
           <p class="hint" id="model-hint"></p>
         </div>
         <div class="field">
+          <label for="apiMode">API 形态</label>
+          <select id="apiMode"><option value="responses">Responses API（POST /responses）</option><option value="chat">Chat Completions（POST /chat/completions）</option></select>
+          <p class="hint" id="api-mode-state"></p>
+        </div>
+        <div class="field">
           <label for="thinkingMode">思考模式</label>
-          <select id="thinkingMode">
-            <option value="default">跟随模型默认（由服务端决定）</option>
-            <option value="disabled">关闭（最快最省，划词翻译推荐）</option>
-            <option value="enabled">开启（先想再答，术语更稳）</option>
-          </select>
+          <select id="thinkingMode"><option value="default">跟随模型默认（由服务端决定）</option><option value="disabled">关闭（最快最省，划词翻译推荐）</option><option value="enabled">开启（先想再答，术语更稳）</option></select>
           <p class="hint" id="thinking-state"></p>
         </div>
         <div class="field">
           <label for="reasoningEffort">思考强度</label>
-          <select id="reasoningEffort">
-            <option value="low">low（快）</option>
-            <option value="high">high（默认）</option>
-            <option value="max">max（最慢最贵）</option>
-          </select>
+          <select id="reasoningEffort"><option value="low">low（快）</option><option value="high">high（默认）</option><option value="max">max（最慢最贵）</option></select>
           <p class="hint">仅「开启」时发送。</p>
         </div>
         <div class="field">
@@ -127,119 +139,114 @@
           <input id="timeoutSec" type="number" min="5" max="600" step="5" />
         </div>
       </div>
-
-      <label class="switch">
-        <input id="stream" type="checkbox" />
-        <span>流式输出（边生成边显示，推荐开启）</span>
-      </label>
-
       <details class="adv">
         <summary>高级：自定义请求头 / 请求体（自建中转时用）</summary>
         <div class="grid2">
-          <div class="field">
-            <label for="extraHeaders">额外请求头（JSON）</label>
-            <textarea id="extraHeaders" rows="3" spellcheck="false" placeholder='{"X-Custom": "value"}'></textarea>
-          </div>
-          <div class="field">
-            <label for="customBody">额外请求体（JSON，划词时覆盖同名字段）</label>
-            <textarea id="customBody" rows="3" spellcheck="false" placeholder='{"top_p": 0.9}'></textarea>
-          </div>
+          <div class="field"><label for="extraHeaders">额外请求头（JSON）</label><textarea id="extraHeaders" rows="3" spellcheck="false" placeholder='{"X-Custom": "value"}'></textarea></div>
+          <div class="field"><label for="customBody">额外请求体（JSON，划词时覆盖同名字段）</label><textarea id="customBody" rows="3" spellcheck="false" placeholder='{"top_p": 0.9}'></textarea></div>
         </div>
         <p class="hint">攻略全文翻译固定保留 messages / input / instructions 和 JSON 输出格式（text / response_format），用于保证双语结构与数字校验；这些字段的覆盖只在划词翻译生效。</p>
       </details>
     </section>
 
+    </div>
+
+    <section id="settings-panel-advanced" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-advanced" data-settings-panel="advanced" tabindex="0" hidden>
+      <div class="advanced-gate-toggle">
+        <button id="btn-enable-advanced" class="btn primary" type="button" aria-pressed="false">开启高阶设置</button>
+      </div>
+      <section class="card advanced-gated" data-advanced-controls aria-disabled="true" inert>
+        <div class="card-titlebar"><h2>划词翻译</h2></div>
+        <div class="field">
+          <div class="label-row">
+            <label for="systemPrompt">系统提示词（system）</label>
+            <button class="btn tiny" type="button" data-reset="systemPrompt">恢复默认</button>
+          </div>
+          <textarea id="systemPrompt" rows="12" spellcheck="false"></textarea>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label for="userPrompt">用户提示词（user）</label>
+            <button class="btn tiny" type="button" data-reset="userPrompt">恢复默认</button>
+          </div>
+          <textarea id="userPrompt" rows="7" spellcheck="false"></textarea>
+          <div class="chips" id="placeholder-chips"></div>
+          <p class="hint">点击上面的标签可插入占位符。<strong>必须包含 <code>{{text}}</code></strong>；如果忘了写，扩展会自动把原文追加到末尾。</p>
+        </div>
+        <div class="card-actions">
+          <button id="btn-preview" class="btn" type="button">预览划词请求</button>
+        </div>
+        <pre id="preview" class="preview" hidden></pre>
+      </section>
+    </section>
+
     <!-- 2. 提示词 -->
-    <section class="card">
-      <div class="card-head">
-        <h2>2 · 划词翻译提示词</h2>
-        <p class="desc">以下提示词仅用于划词翻译，用占位符嵌入选中的文本。全文翻译使用独立的 POE2 本地化模板，不会拼接这里的设置。</p>
+    <section id="settings-panel-selection" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-selection" data-settings-panel="selection" tabindex="0" hidden>
+      <section class="card">
+      <div class="field">
+        <div class="switch switch-checkbox">
+          <input id="dualOutput" type="checkbox" aria-label="划词翻译同时输出简中和繁中两个版本" />
+          <label for="dualOutput">划词翻译同时输出 <strong>简中 + 繁中</strong> 两个版本</label>
+        </div>
       </div>
 
       <div class="field">
-        <label class="switch">
-          <input id="dualOutput" type="checkbox" />
-          <span>划词翻译同时输出 <strong>简中 + 繁中</strong> 两个版本</span>
-        </label>
-        <p class="hint">
-          POE2 的简中与繁中是<strong>两套互相独立的译名</strong>，不是简繁字形转换
-          （<code>Abyssal Lich</code> → 简中「深渊巫妖」/ 繁中「深淵妖巫」）。
-          开启后模型按 <code>【简中】</code> <code>【繁中】</code> 两段输出，面板分块展示、各自可复制；
-          上下文里本地术语表、poe2db 直查与检索结果都会同时给出简繁两套名称。
-          关掉则退回「只翻下面这一种目标语言」的老行为。
-        </p>
-      </div>
-
-      <div class="field">
-        <label for="targetLang">目标语言</label>
-        <input id="targetLang" type="text" list="lang-presets" spellcheck="false" placeholder="简体中文" />
-        <datalist id="lang-presets">
-          <option value="简体中文"></option>
-          <option value="繁體中文"></option>
-          <option value="English"></option>
-          <option value="日本語"></option>
-          <option value="한국어"></option>
-          <option value="Français"></option>
-          <option value="Deutsch"></option>
-          <option value="Русский"></option>
-        </datalist>
+        <label for="targetLangTrigger">目标语言</label>
+        <div id="targetLangControl" class="animated-select">
+          <button id="targetLangTrigger" class="animated-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="targetLangOptions">
+            <span id="targetLangLabel">简体中文</span>
+            <span class="animated-select-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="targetLangOptions" class="animated-select-menu" role="listbox" aria-label="目标语言" aria-hidden="true">
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="简体中文">简体中文</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="繁體中文">繁體中文</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="English">English</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="日本語">日本語</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="한국어">한국어</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="Français">Français</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="Deutsch">Deutsch</button>
+            <button class="animated-select-option" type="button" role="option" aria-selected="false" data-target-lang="Русский">Русский</button>
+          </div>
+          <input id="targetLang" type="hidden" value="简体中文" />
+        </div>
         <p class="hint">
           会替换提示词里的 <code>{{targetLang}}</code>；上面开启「简中 + 繁中」后，这个值只用于
           决定先取哪一种中文译名（请求顺序与展示顺序），两版译文都会给出。
         </p>
       </div>
 
-      <div class="field">
-        <div class="label-row">
-          <label for="systemPrompt">系统提示词（system）</label>
-          <button class="btn tiny" type="button" data-reset="systemPrompt">恢复默认</button>
-        </div>
-        <textarea id="systemPrompt" rows="12" spellcheck="false"></textarea>
-      </div>
+      </section>
 
-      <div class="field">
-        <div class="label-row">
-          <label for="userPrompt">用户提示词（user）</label>
-          <button class="btn tiny" type="button" data-reset="userPrompt">恢复默认</button>
-        </div>
-        <textarea id="userPrompt" rows="7" spellcheck="false"></textarea>
-        <div class="chips" id="placeholder-chips"></div>
-        <p class="hint">点击上面的标签可插入占位符。<strong>必须包含 <code>{{text}}</code></strong>；如果忘了写，扩展会自动把原文追加到末尾。</p>
-      </div>
-
-      <div class="card-actions">
-        <button id="btn-preview" class="btn" type="button">预览划词请求</button>
-      </div>
-      <pre id="preview" class="preview" hidden></pre>
-    </section>
-
-    <!-- 3. 交互 -->
-    <section class="card">
+      <section class="card">
       <div class="card-head">
-        <h2>3 · 划词与面板</h2>
+        <h2>划词与面板</h2>
         <p class="desc">控制选中文字后发生什么。</p>
       </div>
 
-      <label class="switch">
-        <input id="showButton" type="checkbox" />
-        <span>划词后显示悬浮翻译按钮</span>
-      </label>
-      <label class="switch">
-        <input id="autoTranslate" type="checkbox" />
-        <span>划词后自动翻译（不再需要点击按钮）</span>
-      </label>
-      <label class="switch">
-        <input id="keepSource" type="checkbox" />
-        <span>面板中保留原文（可折叠）</span>
-      </label>
-      <label class="switch">
-        <input id="showPrompt" type="checkbox" />
-        <span>面板中折叠展示本次实际发出的 prompt（system / user 原文）</span>
-      </label>
-      <label class="switch">
-        <input id="autoClosePanel" type="checkbox" />
-        <span>点击页面空白处自动关闭结果面板</span>
-      </label>
+      <div class="switch switch-checkbox">
+        <input id="showButton" type="checkbox" aria-label="划词后显示悬浮翻译按钮" />
+        <label for="showButton">划词后显示悬浮翻译按钮</label>
+      </div>
+      <div class="switch switch-checkbox">
+        <input id="keepSource" type="checkbox" aria-label="面板中保留原文（可折叠）" />
+        <label for="keepSource">面板中保留原文（可折叠）</label>
+      </div>
+      <div class="switch switch-checkbox">
+        <input id="autoTranslate" type="checkbox" aria-label="划词后自动翻译（不再需要点击按钮）" />
+        <label for="autoTranslate">划词后自动翻译（不再需要点击按钮）</label>
+      </div>
+      <div class="switch switch-checkbox">
+        <input id="showPrompt" type="checkbox" aria-label="面板中折叠展示本次实际发出的 prompt（system / user 原文）" />
+        <label for="showPrompt">面板中折叠展示本次实际发出的 prompt（system / user 原文）</label>
+      </div>
+      <div class="switch switch-checkbox">
+        <input id="autoClosePanel" type="checkbox" aria-label="点击页面空白处自动关闭结果面板" />
+        <label for="autoClosePanel">点击页面空白处自动关闭结果面板</label>
+      </div>
+      <div class="switch switch-checkbox">
+        <input id="showContext" type="checkbox" aria-label="划词翻译结果面板里展示命中的术语与检索来源" />
+        <label for="showContext">划词翻译结果面板里展示命中的术语与检索来源</label>
+      </div>
 
       <div class="grid2">
         <div class="field">
@@ -260,135 +267,143 @@
           <p class="hint">超出会提示缩短选区，避免产生高额费用。</p>
         </div>
       </div>
+
+      <div class="field">
+        <label for="selectionMatchPatterns">划词翻译适用网站</label>
+        <textarea id="selectionMatchPatterns" rows="4" spellcheck="false" placeholder="https://bilibili.com/*&#10;https://*.mobalytics.gg/*"></textarea>
+        <p class="hint">每行一条规则，留空则不在网页注入划词翻译。支持 <code>*</code> 通配符，例如 <code>https://*.bilibili.com/*</code> 或 <code>https://example.com/guide/*</code>。点击保存后会申请这些网站的访问权限；刷新已打开网页后生效。</p>
+      </div>
+      </section>
     </section>
 
+    <div id="settings-panel-glossary" class="settings-panel advanced-gated" data-settings-panel="advanced" data-advanced-controls aria-disabled="true" hidden inert>
     <!-- 4. 术语表与联网补充 -->
     <section class="card">
-      <div class="card-head">
-        <h2>4 · 术语表与联网补充</h2>
-        <p class="desc">
-          翻译前先从<strong>本地 POE2 术语表</strong>里检索命中的术语，作为上下文交给模型；
-          本地没有覆盖到的内容，再用 <a href="https://tavily.com" target="_blank" rel="noreferrer">Tavily</a> 检索
-          <code>poe2db.tw</code> 补齐。不会再往请求体里塞服务端搜索工具（官方对内置工具是「忽略」）。
-        </p>
-      </div>
-
-      <label class="switch">
-        <input id="glossaryEnabled" type="checkbox" />
-        <span>启用本地术语表检索</span>
-      </label>
-      <label class="switch">
-        <input id="glossaryStrict" type="checkbox" />
-        <span>命中术语时要求模型必须采用表内译名</span>
-      </label>
-      <label class="switch">
-        <input id="showContext" type="checkbox" />
-        <span>结果面板里展示命中的术语与检索来源</span>
-      </label>
-
-      <div class="grid2">
-        <div class="field">
-          <label for="glossaryMaxTerms">最多注入术语条数</label>
-          <input id="glossaryMaxTerms" type="number" min="1" max="200" step="1" />
-          <p class="hint">条数越多上下文越长，费用也越高。</p>
-        </div>
-        <div class="field">
-          <label for="glossaryCategories">限定分类（逗号分隔，留空＝全部）</label>
-          <input id="glossaryCategories" type="text" spellcheck="false" placeholder="GemEffects,keyword" />
-          <p class="hint" id="glossary-categories"></p>
+      <div class="card-titlebar">
+        <div class="titlebar-heading">
+          <h2>术语表</h2>
+          <span class="tooltip-help">
+            <button type="button" aria-label="术语表维护说明" aria-describedby="glossary-maintenance-tooltip">?</button>
+            <span id="glossary-maintenance-tooltip" class="tooltip-help__content" role="tooltip">请不要轻易导入新的术语表，当前术语库由作者维护。只有在确认版本有误或需要临时覆盖时再导入。</span>
+          </span>
         </div>
       </div>
-
       <p class="hint" id="glossary-stats"></p>
 
       <div class="card-actions">
         <button id="btn-glossary-test" class="btn" type="button">测试抽取</button>
-        <input id="glossary-file" type="file" accept=".jsonl,.json,.txt" hidden />
-        <button id="btn-glossary-import" class="btn" type="button">导入更新后的术语表</button>
-        <button id="btn-glossary-reset" class="btn" type="button">恢复内置术语表</button>
+        <input id="glossary-file" type="file" accept=".csv,.jsonl,.json,.txt" hidden />
+        <button id="btn-glossary-import" class="btn" type="button">导入术语表</button>
+      </div>
+      <div id="glossary-import-progress" class="glossary-import-progress" hidden aria-live="polite">
+        <div class="glossary-import-progress-head"><span id="glossary-import-status">准备导入…</span><span id="glossary-import-percent">0%</span></div>
+        <progress id="glossary-import-bar" max="100" value="0" aria-label="术语表导入进度"></progress>
       </div>
       <pre id="glossary-preview" class="preview" hidden></pre>
+    </section>
 
+    <section class="card">
+      <div class="card-titlebar custom-term-titlebar">
+        <div class="titlebar-heading">
+          <h2>自定义术语</h2>
+          <span class="tooltip-help">
+            <button type="button" aria-label="自定义术语说明" aria-describedby="custom-term-tooltip">?</button>
+            <span id="custom-term-tooltip" class="tooltip-help__content" role="tooltip">把非标准英文术语映射到官方标准术语</span>
+          </span>
+        </div>
+        <button id="btn-custom-term-add" class="btn primary" type="button">添加自定义术语</button>
+      </div>
+      <div id="customTermAliasList" class="custom-term-alias-list"></div>
+      <details class="adv">
+        <summary>高级：直接编辑术语映射 JSON</summary>
+        <div class="field">
+          <label for="customTermAliases">自定义术语映射（JSON）</label>
+          <textarea id="customTermAliases" rows="7" spellcheck="false" placeholder="[{&quot;alias&quot;:&quot;Lesser Jewellers Orb&quot;,&quot;canonical&quot;:&quot;Lesser Jeweller's Orb&quot;}]"></textarea>
+          <p class="hint">每项格式为 <code>{"alias":"原文写法","canonical":"官方英文术语"}</code>。通过上方界面添加或删除也会同步更新这里，设置自动保存在本机。</p>
+        </div>
+      </details>
+    </section>
+
+    <section class="card ws-search-card">
+      <div class="card-titlebar"><h2>联网搜索</h2></div>
       <div class="ws-block">
-        <label class="switch">
-          <input id="poe2dbDirectEnabled" type="checkbox" />
-          <span>术语表没收录时，<strong>按术语直接构造 poe2db 页面抓取</strong>（不经过搜索）</span>
-        </label>
-        <p class="hint">
-          从原文里挑出像专名的英文片段后，按 slug 规则构造
-          <code>https://poe2db.tw/&lt;语言&gt;/&lt;术语&gt;</code> 直接抓该页——页面标题就是它的正式译名。
-          slug 规则是从术语表 2244 条真实来源链接反推的，可复现 <strong>95.5%</strong>；
-          构造错了会 404，再回退到下面的 Tavily 检索。
-        </p>
-        <p class="hint">
-          每个术语会把 <code>/cn/</code> 与 <code>/tw/</code> <strong>两套译名都抓回来</strong>
-          （如 Abyssal Lich → 深渊巫妖 / 深淵巫妖），一起写进提示词，按目标语言取用；
-          <code>/us/</code> 页标题就是英文原名，只在这两种中文页都没命中时兜底一次。
-          通常一个术语需要 2 次请求；中文页均未命中时还会尝试英文页，最多 3 次，且受总请求预算限制。
-        </p>
-        <div class="grid2">
-          <div class="field">
-            <label for="poe2dbMaxTerms">最多直查几个术语</label>
-            <input id="poe2dbMaxTerms" type="number" min="1" max="10" step="1" />
+        <div class="ws-block-header">
+          <div class="ws-block-heading">
+            <span class="ws-block-number" aria-hidden="true">01</span>
+            <div><h3 class="ws-block-title">抓取 poe2db.tw 页面</h3><p class="ws-block-description">按术语构造页面地址，直接获取 poe2db 上的官方词条。</p></div>
           </div>
-          <div class="field">
-            <label for="poe2dbRequestBudget">单次最多抓几个页面</label>
-            <input id="poe2dbRequestBudget" type="number" min="1" max="20" step="1" />
-            <p class="hint">
-              缓存命中不计入预算；404 会被记住，不会反复重抓。默认 8 ≈ 3 个术语 ×（cn+tw）。
-            </p>
+          <div class="switch switch-checkbox ws-block-switch">
+            <input id="poe2dbDirectEnabled" type="checkbox" aria-label="启用直查" />
+            <label for="poe2dbDirectEnabled">启用直查</label>
           </div>
         </div>
-        <div class="card-actions">
-          <button id="btn-poe2db-test" class="btn" type="button">测试直查</button>
-          <button id="btn-poe2db-clear" class="btn" type="button">清空页面缓存</button>
+        <div class="ws-block-body">
+          <div class="grid2">
+            <div class="field">
+              <label for="poe2dbMaxTerms">最多直查几个术语</label>
+              <input id="poe2dbMaxTerms" type="number" min="1" max="10" step="1" />
+            </div>
+            <div class="field">
+              <label for="poe2dbRequestBudget">单次最多抓几个页面</label>
+              <input id="poe2dbRequestBudget" type="number" min="1" max="20" step="1" />
+            </div>
+          </div>
+          <div class="ws-block-footer">
+            <div class="card-actions">
+              <button id="btn-poe2db-test" class="btn" type="button">测试直查</button>
+              <button id="btn-poe2db-clear" class="btn" type="button">清空缓存</button>
+            </div>
+            <p class="hint" id="poe2db-cache-state"></p>
+          </div>
         </div>
-        <p class="hint" id="poe2db-cache-state"></p>
       </div>
 
       <div class="ws-block">
-        <label class="switch">
-          <input id="tavilyEnabled" type="checkbox" />
-          <span>直查不到时，用 Tavily 检索 <code>poe2db.tw</code> 兜底</span>
-        </label>
+        <div class="ws-block-header">
+          <div class="ws-block-heading">
+            <span class="ws-block-number" aria-hidden="true">02</span>
+            <div><h3 class="ws-block-title">Tavily 检索</h3><p class="ws-block-description">按配置的网站与语言路径搜索补充词条上下文。</p></div>
+          </div>
+          <div class="switch switch-checkbox ws-block-switch">
+            <input id="tavilyEnabled" type="checkbox" aria-label="启用 Tavily" />
+            <label for="tavilyEnabled">启用 Tavily</label>
+          </div>
+        </div>
+        <div class="ws-block-body">
+          <div class="field">
+            <label for="tavilyApiKey">Tavily API 密钥</label>
+            <div class="row">
+              <div class="grow input-with-btn">
+                <input id="tavilyApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="tvly-..." />
+                <button id="btn-toggle-tavily" class="btn tiny" type="button">显示</button>
+              </div>
+            </div>
+            <p class="hint" id="tavily-state"></p>
+          </div>
 
-        <div class="field">
-          <label for="tavilyApiKey">Tavily API 密钥</label>
-          <div class="row">
-            <div class="grow input-with-btn">
-              <input id="tavilyApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="tvly-..." />
-              <button id="btn-toggle-tavily" class="btn tiny" type="button">显示</button>
+          <div class="grid2">
+            <div class="field">
+              <label for="tavilyMaxResults">最多检索结果数</label>
+              <input id="tavilyMaxResults" type="number" min="1" max="10" step="1" />
+            </div>
+            <div class="field">
+              <label for="tavilyDomains">限定站点</label>
+              <input id="tavilyDomains" type="text" spellcheck="false" placeholder="poe2db.tw" />
+            </div>
+            <div class="field">
+              <label for="poe2dbLocales">限定语言路径</label>
+              <input id="poe2dbLocales" type="text" spellcheck="false" placeholder="us,cn,tw" />
             </div>
           </div>
-          <p class="hint" id="tavily-state"></p>
-        </div>
 
-        <div class="grid2">
-          <div class="field">
-            <label for="tavilyMaxResults">最多检索结果数</label>
-            <input id="tavilyMaxResults" type="number" min="1" max="10" step="1" />
-          </div>
-          <div class="field">
-            <label for="tavilyDomains">限定站点</label>
-            <input id="tavilyDomains" type="text" spellcheck="false" placeholder="poe2db.tw" />
-            <p class="hint">逗号分隔，会作为 include_domains 传给 Tavily。</p>
-          </div>
-          <div class="field">
-            <label for="poe2dbLocales">限定语言路径</label>
-            <input id="poe2dbLocales" type="text" spellcheck="false" placeholder="us,cn,tw" />
-            <p class="hint">
-              poe2db.tw 的语言路径：<code>/us/</code> 英文原文、<code>/cn/</code> 简中、<code>/tw/</code> 繁中。
-              Tavily 的 include_domains 只能限到域名、限不到路径，所以插件会在返回结果里按这些前缀过滤，
-              <code>/jp/</code>、<code>/kr/</code> 等其它语言页会被丢掉；留空＝不限语言。
-            </p>
+          <div class="ws-block-footer">
+            <div class="card-actions">
+              <button id="btn-tavily-test" class="btn" type="button">测试 Tavily 检索</button>
+              <button id="btn-tavily-clear" class="btn" type="button">清空检索缓存</button>
+            </div>
+            <p class="hint" id="tavily-cache-state"></p>
           </div>
         </div>
-
-        <div class="card-actions">
-          <button id="btn-tavily-test" class="btn" type="button">测试 Tavily 检索</button>
-          <button id="btn-tavily-clear" class="btn" type="button">清空检索缓存</button>
-        </div>
-        <p class="hint" id="tavily-cache-state"></p>
       </div>
     </section>
 
@@ -403,82 +418,100 @@
         <p class="hint">填写国服市集中选择的完整赛季名称。换赛季时在这里修改；英文和繁中模式仍使用国际服搜索。</p>
       </div>
     </section>
+    </div>
 
-    <!-- 5. 费用估算 -->
-    <section class="card">
-      <div class="card-head">
-        <h2>5 · 费用估算</h2>
-        <p class="desc">
-          划词翻译完成后在结果面板、攻略全文翻译结束后在攻略状态栏显示本次消耗金额（人民币估算值）。
-          沿用原插件内置价目表（不会自动更新），可在 <a id="price-link" href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing" target="_blank" rel="noreferrer">DeepSeek 官方价目表</a> 核对后填写自定义单价，
-          仅作估算，实际扣费以平台账单为准。
-        </p>
-      </div>
-
-      <label class="switch">
-        <input id="showCost" type="checkbox" />
-        <span>显示划词及攻略全文翻译的本次费用估算</span>
-      </label>
-      <label class="switch">
-        <input id="costAutoPeak" type="checkbox" />
-        <span>自动区分高峰 / 空闲时段（北京时间，空闲价为高峰价的一半）</span>
-      </label>
-
-      <div class="grid2">
-        <div class="field">
-          <label for="costModel">计费模型</label>
-          <select id="costModel">
-            <option value="auto">自动（按当前模型推断）</option>
-            <option value="deepseek-flash">deepseek-flash（旧名 chat/reasoner 也按此计费）</option>
-            <option value="deepseek-v4-pro">deepseek-v4-pro</option>
-            <option value="custom">自定义单价</option>
-          </select>
+    <section class="settings-panel advanced-gated" id="debug-section" data-settings-panel="advanced" data-advanced-controls aria-disabled="true" hidden inert>
+      <section class="debug-block">
+        <div class="debug-heading-row">
+          <h3>攻略翻译调试</h3>
+          <div class="switch switch-checkbox debug-heading-switch">
+            <input id="debugEnabled" type="checkbox" aria-label="开启攻略翻译 Debug 模式（下一次开始 / 继续翻译时生效）" aria-controls="translation-debug-content" />
+            <label for="debugEnabled" aria-hidden="true"></label>
+          </div>
         </div>
-      </div>
-      <p class="hint" id="cost-state"></p>
-
-      <div class="grid2" id="custom-prices">
-        <div class="field">
-          <label for="priceCacheHit">输入·缓存命中（元/百万 tokens）</label>
-          <input id="priceCacheHit" type="number" min="0" step="0.01" />
+        <div id="translation-debug-content" class="debug-content" hidden>
+          <div class="debug-toolbar">
+            <p id="debug-state" class="debug-count" role="status">正在读取调试日志…</p>
+            <div class="debug-toolbar-actions">
+              <button id="btn-debug-refresh" class="btn primary" type="button" title="刷新日志" aria-label="刷新日志"><span aria-hidden="true">↻</span><span>刷新</span></button>
+              <button id="btn-debug-export" class="btn primary" type="button" title="导出 JSON" aria-label="导出 JSON"><span aria-hidden="true">⇩</span><span>导出 JSON</span></button>
+              <button id="btn-debug-clear" class="btn danger" type="button" title="清空调试日志" aria-label="清空调试日志"><span aria-hidden="true">⌫</span><span>清空</span></button>
+            </div>
+          </div>
+          <div class="debug-subcard">
+            <div class="debug-subcard-title">批次记录</div>
+            <div class="debug-picker">
+              <button id="debug-batch-trigger" class="debug-picker-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="debug-batch-options">
+                <span id="debug-batch-current" class="debug-picker-current">暂无记录</span><span class="debug-picker-chevron" aria-hidden="true"></span>
+              </button>
+              <div id="debug-batch-options" class="debug-picker-options" role="listbox" aria-label="攻略翻译批次" hidden></div>
+              <select id="debug-batch" aria-hidden="true" tabindex="-1" hidden></select>
+            </div>
+            <div class="debug-accordion">
+              <button id="debug-details-toggle" class="debug-accordion-trigger" type="button" aria-expanded="false" aria-controls="debug-details-panel">
+                <span class="debug-accordion-chevron" aria-hidden="true"></span><span>查看所选批次的完整输入、输出与日志</span>
+              </button>
+              <div id="debug-details-panel" class="debug-accordion-panel" aria-hidden="true" inert>
+                <div class="debug-accordion-inner">
+              <div class="debug-copy-row"><button id="btn-debug-copy" class="btn primary" type="button" disabled>复制当前批次</button></div>
+              <pre id="debug-preview" class="debug-preview"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label for="priceCacheMiss">输入·缓存未命中（元/百万 tokens）</label>
-          <input id="priceCacheMiss" type="number" min="0" step="0.01" />
+      </section>
+      <section class="debug-block">
+        <div class="debug-heading-row">
+          <h3>攻略页面请求调试</h3>
+          <div class="switch switch-checkbox debug-heading-switch">
+            <input id="fetchDebugExpanded" type="checkbox" aria-label="展开攻略页面请求调试内容" aria-controls="fetch-debug-content" checked />
+            <label for="fetchDebugExpanded" aria-hidden="true"></label>
+          </div>
         </div>
-        <div class="field">
-          <label for="priceOutput">输出（元/百万 tokens）</label>
-          <input id="priceOutput" type="number" min="0" step="0.01" />
+        <div id="fetch-debug-content" class="debug-content">
+          <div class="debug-toolbar">
+            <p id="fetch-debug-state" class="debug-count" role="status">正在读取页面请求日志…</p>
+            <div class="debug-toolbar-actions">
+              <button id="btn-fetch-debug-refresh" class="btn primary" type="button" title="刷新请求日志" aria-label="刷新请求日志"><span aria-hidden="true">↻</span><span>刷新</span></button>
+              <button id="btn-fetch-debug-export" class="btn primary" type="button" disabled title="导出 JSON" aria-label="导出 JSON"><span aria-hidden="true">⇩</span><span>导出 JSON</span></button>
+              <button id="btn-fetch-debug-clear" class="btn danger" type="button" title="清空请求日志" aria-label="清空请求日志"><span aria-hidden="true">⌫</span><span>清空</span></button>
+            </div>
+          </div>
+          <div class="debug-subcard">
+            <div class="debug-subcard-title">页面请求记录</div>
+            <div class="debug-picker">
+              <button id="fetch-debug-session-trigger" class="debug-picker-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="fetch-debug-session-options">
+                <span id="fetch-debug-session-current" class="debug-picker-current">暂无记录</span><span class="debug-picker-chevron" aria-hidden="true"></span>
+              </button>
+              <div id="fetch-debug-session-options" class="debug-picker-options" role="listbox" aria-label="攻略页面请求记录" hidden></div>
+              <select id="fetch-debug-session" aria-hidden="true" tabindex="-1" hidden></select>
+            </div>
+            <div class="debug-copy-row"><button id="btn-fetch-debug-copy" class="btn btn-ghost" type="button" disabled>复制所选请求日志</button></div>
+            <div class="debug-accordion">
+              <button id="fetch-details-toggle" class="debug-accordion-trigger" type="button" aria-expanded="false" aria-controls="fetch-details-panel">
+                <span class="debug-accordion-chevron" aria-hidden="true"></span><span>查看所选请求的完整日志</span>
+              </button>
+              <div id="fetch-details-panel" class="debug-accordion-panel" aria-hidden="true" inert>
+                <div class="debug-accordion-inner"><pre id="fetch-debug-preview" class="debug-preview"></pre></div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      <p class="hint">高峰时段：北京时间周一至周五 9:00-12:00、14:00-18:00（法定节假日无法在本地判断，会按高峰价估算）。</p>
-    </section>
-
-    <section class="card" id="debug-section">
-      <div class="card-head">
-        <h2>6 · Debug 日志</h2>
-        <p class="desc">排查攻略全文翻译的返回内容或接口问题。开启后记录后续每批的完整原文、最终请求体（含提示词和术语）、模型返回、流式文本、处理阶段、缓存写入情况与错误详情；不额外发送翻译请求。</p>
-      </div>
-      <label class="switch">
-        <input id="debugEnabled" type="checkbox" />
-        <span>开启攻略翻译 Debug 模式（下一次开始 / 继续翻译时生效）</span>
-      </label>
-      <p class="hint">日志仅保存在本机，保留最近 500 批，超出后删除最早记录。API 密钥和鉴权请求头会脱敏；日志仍包含完整攻略文本及自定义提示词。旧版失败无法追溯，已缓存内容不会为调试重新请求。关闭开关不清除已有日志。</p>
-      <p id="debug-state" class="hint" role="status">正在读取调试日志…</p>
-      <div class="card-actions">
-        <button id="btn-debug-refresh" class="btn" type="button">刷新日志</button>
-        <button id="btn-debug-export" class="btn" type="button">导出全部调试日志（JSON）</button>
-        <button id="btn-debug-clear" class="btn danger" type="button">清空调试日志</button>
-      </div>
-      <div class="field">
-        <label for="debug-batch">查看批次</label>
-        <select id="debug-batch"></select>
-      </div>
-      <details>
-        <summary>查看所选批次的完整输入、输出与日志</summary>
-        <pre id="debug-preview" class="debug-preview"></pre>
-      </details>
-      <p class="hint">错误提示中的“调试记录”编号与这里的批次编号对应。也可在 chrome://extensions 中打开 poe2ultra 的 Service Worker 控制台，筛选 [poe2ultra debug] 查看实时日志。清空日志不会清除译文缓存。</p>
+      </section>
+      <section id="settings-panel-cache" class="debug-block cache-debug-block">
+        <div class="cache-debug-header"><h3>攻略全文翻译与缓存</h3></div>
+        <p id="guide-cache-state" class="hint">正在读取攻略缓存…</p>
+        <div class="card-actions">
+          <button id="btn-guide-cache-export" class="btn" type="button">导出译文缓存（JSON）</button>
+          <button id="btn-translations-csv-export" class="btn" type="button" data-personal-build-only>导出累计译文（CSV）</button>
+          <button id="btn-guide-cache-import" class="btn" type="button">选择缓存备份</button>
+          <input id="guide-cache-file" type="file" accept=".json,application/json" hidden />
+          <button id="btn-guide-cache-clear" class="btn danger" type="button">清空攻略译文（保留费用记录）</button>
+        </div>
+        <p id="guide-cache-import-preview" class="hint" role="status" hidden></p>
+        <button id="btn-guide-cache-import-confirm" class="btn primary" type="button" hidden>合并并恢复翻译参数</button>
+      </section>
     </section>
 
     <footer class="bottom">

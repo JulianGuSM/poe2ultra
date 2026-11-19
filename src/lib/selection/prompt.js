@@ -65,7 +65,7 @@ export function renderTemplate(template, vars) {
 }
 
 /**
- * 命中术语时追加到系统提示词的规则（可用 glossaryStrict 关掉）。
+ * 命中术语时始终追加术语表规则。
  * 重点说清「简繁是两套译名、不是字形转换」，否则模型很容易把简中译文用字体转换糊弄成繁中。
  */
 export const TERM_RULE = [
@@ -228,14 +228,13 @@ export function formatSources(sources, limit = 5) {
  * 把「本地术语表这次到底干了什么」说清楚，供面板展示。
  *
  * 之所以需要它：命中 0 条时术语块不会出现在 prompt 里，如果面板什么都不说，
- * 用户根本分不清是「本次没命中」「术语表没加载成功」还是「分类过滤把它滤掉了」。
+ * 用户根本分不清是「本次没命中」还是「术语表没加载成功」。
  *
- * @param {{enabled?:boolean, source?:string, size?:number, matched?:number,
- *          categories?:string[], error?:string}} state
+ * @param {{enabled?:boolean, source?:string, size?:number, matched?:number, error?:string}} state
  */
 export function describeGlossaryState(state = {}) {
   const size = Number(state.size) || 0;
-  const where = state.source === 'imported' ? '已导入术语表' : '内置术语表';
+  const where = state.source === 'imported' ? '已导入的官方术语表' : '内置术语表';
 
   // 补查链路：本地命中 → poe2db 直查 → Tavily，面板一句话交代清楚
   const chain = [];
@@ -251,16 +250,12 @@ export function describeGlossaryState(state = {}) {
   if (!size) return '本地术语表：尚无可用数据';
 
   const matched = Number(state.matched) || 0;
-  const filter = Array.isArray(state.categories) && state.categories.length
-    ? ` · 分类过滤：${state.categories.join(', ')}`
-    : '';
-
   if (matched > 0) {
-    return `本地术语表：${size} 条（${where}）· 命中 ${matched} 条 · 已写入 user 提示词${filter}${tail}`;
+    return `本地术语表：${size} 条（${where}）· 命中 ${matched} 条 · 已写入 user 提示词${tail}`;
   }
   return (
     `本地术语表：${size} 条（${where}）· 本次未命中任何术语，` +
-    `所以 user 提示词里不会有术语块${filter}${tail}`
+    `所以 user 提示词里不会有术语块${tail}`
   );
 }
 
@@ -328,7 +323,7 @@ export function composePrompt(settings, input = {}) {
   if (prefix.length) userText = `${prefix.join('\n\n')}\n\n${userText}`;
 
   const systemParts = [String(settings.systemPrompt || '').trim()];
-  if ((glossaryText || directText) && settings.glossaryStrict !== false) systemParts.push(TERM_RULE);
+  if (glossaryText || directText) systemParts.push(TERM_RULE);
   // 双版本模式：格式要求自动追加，用户改过提示词也不会丢
   if (isDualOutput(settings)) systemParts.push(DUAL_RULE);
 

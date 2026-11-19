@@ -26,8 +26,19 @@ export function useTradeLinks(equipment: EquipmentSlot[]) {
     const changed = (changes: Record<string, unknown>, area: string) => {
       if (area === 'local' && (SETTINGS_KEY in changes || 'glossaryOverride' in changes)) void refresh();
     };
-    browser.storage.onChanged.addListener(changed);
-    return () => { request++; browser.storage.onChanged.removeListener(changed); };
+    let storageListenerAdded = false;
+    try {
+      browser.storage.onChanged.addListener(changed);
+      storageListenerAdded = true;
+    } catch {
+      // Trade links remain unavailable, but must not throw when the extension was reloaded in this tab.
+    }
+    return () => {
+      request++;
+      if (storageListenerAdded) {
+        try { browser.storage.onChanged.removeListener(changed); } catch { /* The runtime may already be gone. */ }
+      }
+    };
   }, [locale, key]);
   return (source: string): TradeLinkResult => locale !== 'cn' ? { url: source }
     : result?.key === key ? result.links[source] ?? { error: result.error ?? '国服搜索链接不可用。' }

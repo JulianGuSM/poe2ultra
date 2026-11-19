@@ -1,50 +1,40 @@
 import { BilingualText } from '@/ui/translation/BilingualText';
-import { Scale } from 'lucide-preact';
-import { useMemo } from 'preact/hooks';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-preact';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { EntityInfo, EquipmentSlot, ItemRef, Variant } from '@/lib/build/model';
-import { gemTooltip, itemTooltip, socketableTooltip } from '@/lib/tooltip/tooltip-model';
-import { type SheetSlot, sheetSlots, slotIconKind, slotLabel } from '@/lib/ui/slots';
+import { itemTooltip, socketableTooltip } from '@/lib/tooltip/tooltip-model';
+import { slotIconKind, slotLabel } from '@/lib/ui/slots';
 import { Icon } from '@/ui/common/Icon';
 import { RichText } from '@/ui/rich-text/RichText';
 import { entityChipRenderer } from '@/ui/tooltip/EntityTooltipChip';
-import { WithTooltip } from '@/ui/tooltip/Tooltip';
-import type { TradeLinkResult } from '@/lib/trade/china';
-import { useTradeLinks } from './useTradeLinks';
+import { TooltipLauncher, WithTooltip } from '@/ui/tooltip/Tooltip';
+import { embedSiteGear, type GearEmbed, type GearEmbedStatus } from '@/lib/gear/site-gear';
 
 const EMPTY = "The author hasn't listed gear for this variant.";
 
-/** An item can grant a handful of skills; the rest are counted, so one item cannot stretch the whole grid. */
-const GRANTS_SHOWN = 2;
-
-export function GearPanel({ variant, entities }: { variant: Variant; entities: Record<string, EntityInfo> }) {
+export function GearPanel({ variant, variantIndex = 0, entities }: { variant: Variant; variantIndex?: number; entities: Record<string, EntityInfo> }) {
   const renderEntity = useMemo(() => entityChipRenderer(entities), [entities]);
+  const renderTranslatedEntity = useMemo(() => entityChipRenderer(entities, true), [entities]);
   const hasEquipment = variant.equipment.length > 0;
-  const tradeLink = useTradeLinks(variant.equipment);
+  const [priorityCollapsed, setPriorityCollapsed] = useState(true);
 
   if (!hasEquipment && !variant.equipmentNotes) {
     return <p class="panel-empty">{EMPTY}</p>;
   }
 
-  const { armour, other } = sheetSlots(variant.equipment);
-  const key = (s: SheetSlot) => `${s.slot}${s.weaponSet ?? ''}`;
-
   return (
     <div class="gear">
       {hasEquipment ? (
         <div class="gear__columns">
-          <section class="card gear__slots" aria-label="Equipment">
-            <div class="gear__armour">
-              {armour.map((s) => (
-                <ItemSlotCard key={key(s)} sheetSlot={s} size="large" tradeLink={tradeLink} />
-              ))}
-            </div>
-            <div class="gear__other">
-              {other.map((s) => (
-                <ItemSlotCard key={key(s)} sheetSlot={s} size="compact" tradeLink={tradeLink} />
-              ))}
-            </div>
-          </section>
-          {variant.itemPriority.length > 0 && <PriorityCard items={variant.itemPriority} equipment={variant.equipment} />}
+          {variant.itemPriority.length > 0 && (
+            <PriorityCard
+              items={variant.itemPriority}
+              equipment={variant.equipment}
+              collapsed={priorityCollapsed}
+              onToggle={() => setPriorityCollapsed((value) => !value)}
+            />
+          )}
+          <SiteEquipment variant={variant} variantIndex={variantIndex} priorityCollapsed={priorityCollapsed} />
         </div>
       ) : (
         <p class="panel-empty">{EMPTY}</p>
@@ -52,89 +42,172 @@ export function GearPanel({ variant, entities }: { variant: Variant; entities: R
       {variant.equipmentNotes && (
         <section class="card gear__notes">
           <h2 class="card__title">Author's Notes</h2>
-          <RichText value={variant.equipmentNotes} renderEntity={renderEntity} />
+          <RichText value={variant.equipmentNotes} renderEntity={renderEntity} renderTranslatedEntity={renderTranslatedEntity} />
         </section>
       )}
     </div>
   );
 }
 
-function ItemSlotCard({ sheetSlot, size, tradeLink }: { sheetSlot: SheetSlot; size: 'large' | 'compact'; tradeLink: (source: string) => TradeLinkResult }) {
-  const label = slotLabel(sheetSlot.slot, sheetSlot.weaponSet);
-  if (!sheetSlot.equipped) {
-    return (
-      <div class={`item-slot item-slot--${size} item-slot--empty`}>
-        <div class="item-slot__art" />
-        <div class="item-slot__body">
-          <span class="item-slot__label">{label}</span>
-          <span class="item-slot__placeholder">Empty</span>
-        </div>
-      </div>
-    );
-  }
+export type EmbedGear = (options: {
+  placeholder: HTMLElement;
+  variantIndex: number;
+  itemIcons: Map<string, number[]>;
+  itemTradeUrls: (string | null)[];
+  socketableCounts: number[];
+  onSelectItem: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
+  onSelectSocketable: (equipmentIndex: number, socketableIndex: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
+  onStatus: (status: GearEmbedStatus) => void;
+}) => GearEmbed;
 
-  const { item, socketables } = sheetSlot.equipped;
-  const trade = item.tradeUrl ? tradeLink(item.tradeUrl) : null;
+const embedIntoPage: EmbedGear = (options) => embedSiteGear({ doc: document, win: window, ...options });
+
+function SiteEquipment({ variant, variantIndex, priorityCollapsed, embedGear = embedIntoPage }: {
+  variant: Variant;
+  variantIndex: number;
+  priorityCollapsed: boolean;
+  embedGear?: EmbedGear;
+}) {
+  const stage = useRef<HTMLDivElement>(null);
+  const embed = useRef<GearEmbed | null>(null);
+  const shownIndex = useRef(variantIndex);
+  const previousCollapse = useRef(priorityCollapsed);
+  const [status, setStatus] = useState<GearEmbedStatus>('loading');
+  const [detail, setDetail] = useState<{
+    anchor: HTMLElement;
+    portalParent: HTMLElement;
+    equipmentIndex: number;
+    socketableIndex: number | null;
+  } | null>(null);
+  const iconIndices = useMemo(() => {
+    const icons = new Map<string, number[]>();
+    variant.equipment.forEach(({ item }, index) => {
+      if (!item.iconUrl) return;
+      const url = normalizeItemUrl(item.iconUrl);
+      icons.set(url, [...(icons.get(url) ?? []), index]);
+    });
+    return icons;
+  }, [variant]);
+  const socketableCounts = useMemo(() => variant.equipment.map(({ socketables }) => socketables.length), [variant]);
+  const itemTradeUrls = useMemo(() => variant.equipment.map(({ item }) => item.tradeUrl), [variant]);
+  useEffect(() => {
+    const placeholder = stage.current!;
+    const handle = embedGear({
+      placeholder,
+      variantIndex: shownIndex.current,
+      itemIcons: iconIndices,
+      itemTradeUrls,
+      socketableCounts,
+      onSelectItem: (equipmentIndex, anchor, portalParent) => setDetail({ equipmentIndex, socketableIndex: null, anchor, portalParent }),
+      onSelectSocketable: (equipmentIndex, socketableIndex, anchor, portalParent) => {
+        const socketable = variant.equipment[equipmentIndex]?.socketables[socketableIndex];
+        console.info('[poe2ultra:gear] panel received socket selection', {
+          equipmentIndex,
+          equipmentName: variant.equipment[equipmentIndex]?.item.name ?? null,
+          socketableIndex,
+          socketableName: socketable?.name ?? null,
+          socketableSlug: socketable?.slug ?? null,
+          equipmentSocketableCount: variant.equipment[equipmentIndex]?.socketables.length ?? 0,
+        });
+        if (socketable) {
+          setDetail({ equipmentIndex, socketableIndex, anchor, portalParent });
+        }
+      },
+      onStatus: setStatus,
+    });
+    embed.current = handle;
+    const scroller = placeholder.closest('.build-view__panel');
+    const follow = () => handle.sync();
+    scroller?.addEventListener('scroll', follow);
+    return () => {
+      scroller?.removeEventListener('scroll', follow);
+      handle.destroy();
+      embed.current = null;
+    };
+  }, [embedGear, iconIndices, itemTradeUrls, socketableCounts, variant.equipment]);
+
+  useEffect(() => {
+    if (previousCollapse.current === priorityCollapsed) return;
+    previousCollapse.current = priorityCollapsed;
+    embed.current?.sync(true);
+  }, [priorityCollapsed]);
+
+  useEffect(() => {
+    if (shownIndex.current === variantIndex) return;
+    shownIndex.current = variantIndex;
+    setDetail(null);
+    embed.current?.setVariant(variantIndex);
+  }, [variantIndex]);
+
+  const equipped = detail && variant.equipment[detail.equipmentIndex];
+  const tooltipRequest = useMemo(
+    () => detail && equipped ? {
+      anchor: detail.anchor,
+      portalParent: detail.portalParent,
+      nativeStyle: true as const,
+      model: detail.socketableIndex === null
+        ? itemTooltip(equipped.item, equipped.socketables)
+        : socketableTooltip(equipped.socketables[detail.socketableIndex]!),
+    } : null,
+    [detail, equipped],
+  );
+
+  useEffect(() => {
+    if (!detail) return;
+    console.info('[poe2ultra:gear] tooltip request', {
+      equipmentIndex: detail.equipmentIndex,
+      socketableIndex: detail.socketableIndex,
+      equipmentName: equipped?.item.name ?? null,
+      tooltipTitle: tooltipRequest?.model.title ?? null,
+      hasAnchor: detail.anchor.isConnected,
+      hasPortalParent: detail.portalParent.isConnected,
+    });
+  }, [detail, equipped, tooltipRequest]);
+
   return (
-    <WithTooltip model={itemTooltip(item, socketables)}>
-      <div class={`item-slot item-slot--${size}`}>
-        <div class="item-slot__art">
-          <Icon src={item.iconUrl} class="item-slot__icon" kind={slotIconKind(sheetSlot.slot)} />
-          {item.tradeUrl && (
-            <a
-              class="item-slot__trade"
-              href={trade?.url}
-              role="link"
-              aria-disabled={!trade?.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Find ${item.name} on the trade site`}
-              title={trade?.error ?? 'Find on the official trade site'}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Scale size={12} aria-hidden="true" />
-            </a>
-          )}
-        </div>
-        <div class="item-slot__body">
-          <span class="item-slot__label">{label}</span>
-          <span class={`item-name item-name--${item.rarity}`}><BilingualText text={item.name} /></span>
-          {item.grantedSkills.slice(0, GRANTS_SHOWN).map((skill) => (
-            <WithTooltip key={skill.name} model={skill.gem ? gemTooltip(skill.gem) : null}>
-              <span class="item-slot__grants">
-                <Icon src={skill.gem?.iconUrl} class="item-slot__grants-icon" kind="gem" />
-                <BilingualText text={skill.name} />
-              </span>
-            </WithTooltip>
-          ))}
-          {item.grantedSkills.length > GRANTS_SHOWN && (
-            <span class="item-slot__grants item-slot__grants--rest">+{item.grantedSkills.length - GRANTS_SHOWN} more</span>
-          )}
-          {size === 'large' && item.modifiers.length > 0 && <span class="item-slot__mods"><BilingualText text={item.modifiers.slice(0, 2).join(' · ')} parts={item.modifiers.slice(0, 2)} /></span>}
-        </div>
-        {socketables.length > 0 && (
-          <span class="item-slot__sockets">
-            {socketables.map((socketable, i) => (
-              <WithTooltip key={i} model={socketableTooltip(socketable)}>
-                <Icon
-                  src={socketable.iconUrl}
-                  class={`item-slot__socket${socketable.iconUrl ? '' : ' item-slot__socket--empty'}`}
-                  alt={socketable.name ?? ''}
-                  kind={socketable.iconUrl ? 'rune' : undefined}
-                />
-              </WithTooltip>
-            ))}
-          </span>
-        )}
+    <section class="card gear__native" aria-label="Equipment">
+      <div class="gear__native-stage" ref={stage}>
+        {status !== 'ready' && <p class="gear__native-status" role="status">{status === 'loading' ? 'Loading the original equipment board…' : 'The site did not show equipment for this build.'}</p>}
       </div>
-    </WithTooltip>
+      <TooltipLauncher request={tooltipRequest} />
+    </section>
   );
 }
 
-function PriorityCard({ items, equipment }: { items: ItemRef[]; equipment: EquipmentSlot[] }) {
+function normalizeItemUrl(value: string): string {
+  try {
+    const url = new URL(value, document.baseURI);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return value;
+  }
+}
+
+function PriorityCard({ items, equipment, collapsed, onToggle }: {
+  items: ItemRef[];
+  equipment: EquipmentSlot[];
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  if (collapsed) {
+    return (
+      <section class="card glance glance--collapsed gear__priority gear__priority--collapsed" aria-label="Gear Priority">
+        <button type="button" class="glance__rail" aria-label="Expand Gear Priority" title="Expand Gear Priority" aria-expanded="false" onClick={onToggle}>
+          <PanelLeftOpen size={16} aria-hidden="true" />
+          <span class="glance__rail-title" aria-hidden="true">Gear Priority</span>
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section class="card gear__priority">
-      <h2 class="card__title">Gear Priority</h2>
+      <div class="glance__header">
+        <h2 class="card__title">Gear Priority</h2>
+        <button type="button" class="icon-button glance__toggle" aria-label="Collapse Gear Priority" title="Collapse Gear Priority" aria-expanded="true" onClick={onToggle}>
+          <PanelLeftClose size={16} aria-hidden="true" />
+        </button>
+      </div>
       <ol class="priority" aria-label="Gear priority">
         {items.map((ref, i) => {
           // Priority entries point at the variant's own items; their tooltips come from the equipped slot.

@@ -5,9 +5,9 @@ import { EntityChip } from '@/ui/rich-text/RichText';
 import { WithTooltip } from './Tooltip';
 
 /** `renderEntity` for guide texts: chips of entities known to static data get a tooltip. */
-export function entityChipRenderer(entities: Record<string, EntityInfo>) {
+export function entityChipRenderer(entities: Record<string, EntityInfo>, openOnChildClick = false) {
   return (entity: RichEntity) => {
     const info = entities[entity.slug];
-    return <WithTooltip model={info ? entityTooltip(info) : null}>{EntityChip(entity)}</WithTooltip>;
+    return <WithTooltip model={info ? entityTooltip(info) : null} openOnChildClick={openOnChildClick}>{EntityChip(entity)}</WithTooltip>;
   };
 }

@@ -8,9 +8,6 @@ export const pageModeItem = storage.defineItem<PageMode>('local:pageMode', { fal
 /** Whether the build header is collapsed to leave more room for the build itself. */
 export const headerCollapsedItem = storage.defineItem<boolean>('local:headerCollapsed', { fallback: false });
 
-/** Whether At a Glance on the Overview tab is collapsed, leaving the guide texts more room. */
-export const glanceCollapsedItem = storage.defineItem<boolean>('local:glanceCollapsed', { fallback: false });
-
 /** The tab each build was last read at, by build slug; a build nobody has opened yet starts at the overview. */
 export const lastTabsItem = storage.defineItem<Record<string, TabId>>('local:lastTabs', { fallback: {} });
 

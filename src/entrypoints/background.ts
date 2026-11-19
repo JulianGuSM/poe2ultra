@@ -4,22 +4,24 @@ import { digest, TranslationEngine } from '@/lib/translation/engine';
 import { validateSegments } from '@/lib/translation/protocol';
 import { translateBatch } from '@/lib/translation/provider.js';
 import { getSettings, saveSettings, requireEndpointPermission, guideCachePrompts, GUIDE_CACHE_PROMPTS_KEY } from '@/lib/translation/preferences';
-import { translationProfile } from '@/lib/translation/profile';
+import { legacyTranslationProfiles, translationProfile } from '@/lib/translation/profile';
 import { createCacheBackup, validateCacheBackup } from '@/lib/translation/cache-backup';
 import { createTranslationCsv } from '@/lib/translation/csv';
-import { normalizeSettings, SETTINGS_KEY, validateSettings } from '@/lib/translation/settings';
+import { effectiveSettings, normalizeSettings, SETTINGS_KEY, validateSettings } from '@/lib/translation/settings';
 import { glossarySnapshot } from '@/lib/translation/glossary-snapshot';
 import { OVERRIDE_KEY } from '@/lib/translation/vendor/glossary.js';
 import { registerSelection } from '@/lib/selection/background.js';
 import { registerTradeLinks } from '@/lib/trade/background';
-import type { Segment } from '@/lib/translation/plan';
+import { segmentKey, type Segment } from '@/lib/translation/plan';
 import { getBuildSlug, isBuildPageUrl } from '@/lib/build-url';
 import { DebugSession, DebugStore } from '@/lib/translation/debug';
+import { FetchDiagnosticsStore } from '@/lib/page/fetch-diagnostics';
 import { estimateCost, formatCny } from '@/lib/translation/vendor/pricing.js';
 import type { Activity } from '@/lib/translation/activity';
 
 const cache = new PersistentCache();
 const debugStore = new DebugStore();
+const fetchDiagnosticsStore = new FetchDiagnosticsStore();
 const engines = new Map<string, TranslationEngine>();
 const reporters = new Map<AbortSignal, (message: object) => void>();
 let cacheTransfer = false;
@@ -30,7 +32,13 @@ export default defineBackground(() => {
   registerTradeLinks();
   browser.action.onClicked.addListener(() => { void browser.runtime.openOptionsPage(); });
   browser.runtime.onMessage.addListener((message, sender, respond) => {
-    if (!['translation-settings', 'translation-debug', 'translation-cache'].includes(message?.type)) return;
+    if (!['translation-settings', 'translation-debug', 'translation-cache', 'page-fetch-diagnostics'].includes(message?.type)) return;
+    if (message.type === 'page-fetch-diagnostics') {
+      if (sender.id !== browser.runtime.id || !isBuildPageUrl(sender.url ?? '') || message.action !== 'append') return;
+      void fetchDiagnosticsStore.append(String(message.sessionId), String(message.url), message.attempt)
+        .then(() => respond({ ok: true }), error => respond({ ok: false, error: String(error) }));
+      return true;
+    }
     // Secrets and settings are available only to our extension options page, never a content script.
     if (sender.id !== browser.runtime.id || sender.url !== browser.runtime.getURL('/options.html')) return;
     void (async () => {
@@ -100,23 +108,36 @@ export default defineBackground(() => {
       if (message?.type === 'ping') return; // Message traffic keeps an active MV3 worker alive.
       if (message?.type === 'options') { void browser.runtime.openOptionsPage(); return; }
       if (message?.type === 'cancel') { controller.abort(); return; }
-      if (!['inspect', 'translate'].includes(message?.type) || busy) return;
+      if (!['inspect', 'translate', 'retranslate'].includes(message?.type) || busy) return;
       if (cacheTransfer) { send({ type: 'error', text: '缓存正在导入或导出，请完成后重试。' }); return; }
       busy = true; controller = new AbortController(); activeJobs++;
       void (async () => {
         validateSegments(message.segments);
         const segments = message.segments as Segment[];
-        const configured = await getSettings();
+        let retranslation: Segment[] | undefined;
+        if (message.type === 'retranslate') {
+          validateSegments(message.retranslationSegments);
+          const available = new Map(segments.map(segment => [segmentKey(segment), segment]));
+          const requested = message.retranslationSegments as Segment[];
+          const selected = requested.map(segment => available.get(segmentKey(segment)));
+          retranslation = selected.filter((segment): segment is Segment => !!segment);
+          if (!retranslation.length || retranslation.length !== requested.length || new Set(requested.map(segmentKey)).size !== requested.length) {
+            throw new Error('找不到要重译的文字块，请刷新攻略页面后重试。');
+          }
+        }
+        const configured = effectiveSettings(await getSettings());
         // Credential changes do not invalidate translations; prompt/model/term-policy changes do.
         const { apiKey, tavilyApiKey, extraHeaders, timeoutMs, stream } = configured;
         const stored = await browser.storage.local.get(OVERRIDE_KEY);
         const override = stored[OVERRIDE_KEY] as { entries?: unknown[]; meta?: object } | undefined;
-        const profile = await translationProfile(configured, override, await guideCachePrompts());
+        const cachePrompts = await guideCachePrompts();
+        const profile = await translationProfile(configured, override, cachePrompts);
+        const fallbackProfiles = await legacyTranslationProfiles(configured, override, cachePrompts);
         const engineKey = await digest(JSON.stringify({ profile, apiKey, tavilyApiKey, extraHeaders, timeoutMs, stream }));
         let engine = engines.get(engineKey);
         if (!engine) {
           // A running task retains the same glossary snapshot even if a new one is imported mid-run.
-          const glossary = configured.glossaryEnabled ? await glossarySnapshot(override) : undefined;
+          const glossary = configured.glossaryEnabled ? await glossarySnapshot(override, configured.customTermAliases) : undefined;
           engine = new TranslationEngine(cache, async (batch, signal, report, debug) => {
             await requireEndpointPermission(configured.baseUrl);
             const result = await translateBatch(batch, configured, signal, report, glossary, debug);
@@ -128,7 +149,8 @@ export default defineBackground(() => {
         }
         const sendGuideCost = async () => send({ type: 'guide-cost', summary: await cache.guideCost(guideKey) });
         if (message.type === 'inspect') {
-          send({ type: 'progress', ...await engine.inspect(segments, profile) });
+          send({ type: 'inspect-progress', checked: 0, total: new Set(segments.map(segmentKey)).size });
+          send({ type: 'progress', ...await engine.inspect(segments, profile, (checked, total) => send({ type: 'inspect-progress', checked, total }), fallbackProfiles) });
           await sendGuideCost();
         }
         else {
@@ -139,7 +161,7 @@ export default defineBackground(() => {
           const activity = (event: Activity) => {
             if (event.stage === 'requesting') requests++;
             if (event.modelRequest) {
-              const estimate = estimateCost(event.usage, configured);
+              const estimate = estimateCost(event.usage, { ...configured, costModel: 'auto', costAutoPeak: true });
               if (estimate) { totalCny += estimate.cny; priced++; }
               costWrites = costWrites.then(async () => {
                 await cache.appendGuideCost(guideKey, estimate?.cny ?? null);
@@ -156,15 +178,22 @@ export default defineBackground(() => {
             guideUrl: sender.url, profile, apiMode: configured.apiMode, model: configured.model,
           }, () => send({ type: 'warning', text: '调试日志保存失败，翻译仍继续。请在设置页检查本地日志存储。' })) : undefined;
           try {
-            const summary = await engine.run(segments, profile, controller.signal,
-              progress => send({ type: 'progress', ...progress }), activity, debug,
-              failure => send({ type: 'batch-error', ...failure }));
+            if (retranslation) {
+              await engine.retranslate(retranslation, profile, controller.signal, activity, debug);
+              send({ type: 'progress', ...await engine.inspect(segments, profile) });
+            } else {
+              const summary = await engine.run(segments, profile, controller.signal,
+                progress => send({ type: 'progress', ...progress }), activity, debug,
+                failure => send({ type: 'batch-error', ...failure }), fallbackProfiles);
+              if (summary.failedBatches) {
+                await costWrites;
+                sendCost();
+                send({ type: 'partial', failedBatches: summary.failedBatches, firstError: summary.failures[0]?.message });
+                return;
+              }
+            }
             await costWrites;
             sendCost();
-            if (summary.failedBatches) {
-              send({ type: 'partial', failedBatches: summary.failedBatches, firstError: summary.failures[0]?.message });
-              return;
-            }
           } catch (error) { await costWrites; sendCost(); throw error; }
         }
         send({ type: 'done' });

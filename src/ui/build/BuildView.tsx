@@ -15,9 +15,10 @@ import { panelElementId, tabElementId, Tabs } from './Tabs';
 import { useTranslation } from '@/ui/translation/useTranslation';
 import { TranslationProvider } from '@/ui/translation/BilingualText';
 import { TranslationBar } from '@/ui/translation/TranslationBar';
+import { ToastProvider } from '@/ui/common/Toast';
 
-/** Tabs whose content fills the panel instead of scrolling it (the embedded site trees, the stage view). */
-const FILL_TABS: TabId[] = ['passives', 'atlas', 'progression'];
+/** Tabs that fill the panel and give tall content its own scroll area. */
+const FILL_TABS: TabId[] = ['passives', 'atlas', 'progression', 'skills'];
 
 export interface BuildViewProps {
   build: Build;
@@ -36,8 +37,6 @@ export interface BuildViewProps {
   defaultVariant?: RememberedVariant | null;
   /** The user picked another variant. */
   onVariantChange?: (variant: RememberedVariant) => void;
-  glanceCollapsed?: boolean;
-  onGlanceCollapsedChange?: (collapsed: boolean) => void;
 }
 
 const NO_VARIANTS = "The author hasn't added build variants yet.";
@@ -55,15 +54,17 @@ export function BuildView({
   onTabChange,
   defaultVariant,
   onVariantChange,
-  glanceCollapsed,
-  onGlanceCollapsedChange,
 }: BuildViewProps) {
   const translation = useTranslation(sourceBuild);
   const build = translation.build;
   const tabs = availableTabs(build);
   const [route, setRoute] = useState<Route>(() => parseRoute(initialHash, sourceBuild, defaultTab, defaultVariant));
+  const [passivesMounted, setPassivesMounted] = useState(route.tab === 'passives');
 
   useEffect(() => subscribeToHash?.((hash) => setRoute(parseRoute(hash, sourceBuild))), [subscribeToHash, sourceBuild]);
+  useEffect(() => {
+    if (route.tab === 'passives') setPassivesMounted(true);
+  }, [route.tab]);
 
   const navigate = (next: Route) => {
     if (next.tab !== route.tab) onTabChange?.(next.tab);
@@ -84,8 +85,22 @@ export function BuildView({
 
   const tab = tabs.find((t) => t.id === route.tab)!;
   const variant = build.variants.find((v) => v.id === route.variantId) ?? build.variants[0];
+  if (translation.initialCacheRead) {
+    const { checked, total } = translation.cacheReadProgress;
+    const percent = total ? Math.min(100, Math.floor(checked / total * 100)) : 0;
+    return <div class="translation-cache-loading">
+      <div class="translation-cache-loading__card">
+        <div class="translation-cache-loading__status" role="status" aria-live="polite">
+          <strong>正在读取翻译缓存</strong>
+          <progress aria-label="缓存读取进度" value={checked} max={Math.max(total, 1)} />
+          <span>{checked.toLocaleString('zh-CN')} / {total.toLocaleString('zh-CN')} 个文字块 · {percent}%</span>
+        </div>
+        <button type="button" class="button" aria-label="Show original page" onClick={onOriginal}>Show original page</button>
+      </div>
+    </div>;
+  }
   return (
-    <TranslationProvider records={translation.state.records} locale={translation.locale}><TooltipProvider resetKey={`${build.id}:${route.tab}:${route.variantId}`}>
+    <TranslationProvider records={translation.state.records} segments={translation.plan.segments} locale={translation.locale} busy={translation.busy} retryingKeys={translation.retryingKeys} retranslateMode={translation.retranslateMode} onRetranslate={translation.retranslate}><ToastProvider><TooltipProvider resetKey={`${build.id}:${route.tab}:${route.variantId}`}>
       <div class="build-view">
         {!headerCollapsed && <BuildHeader build={build} />}
         <div class="tab-bar">
@@ -123,19 +138,29 @@ export function BuildView({
         >
           {tab.hasVariant && route.tab !== 'progression' && <VariantPicker variants={build.variants} selectedId={variant?.id ?? null} onChange={selectVariant} />}
           {route.tab === 'overview' && (
-            <OverviewPanel build={build} glanceCollapsed={glanceCollapsed} onGlanceCollapsedChange={onGlanceCollapsedChange} />
+            <OverviewPanel build={build} />
           )}
           {tab.hasVariant && !variant && <p class="panel-empty">{NO_VARIANTS}</p>}
-          {route.tab === 'gear' && variant && <GearPanel variant={variant} entities={build.entities} />}
+          {route.tab === 'gear' && variant && <GearPanel variant={variant} variantIndex={build.variants.indexOf(variant)} entities={build.entities} />}
           {route.tab === 'skills' && variant && <SkillsPanel key={variant.id} variant={variant} entities={build.entities} />}
-          {route.tab === 'passives' && variant && <PassivesPanel variant={variant} variantIndex={build.variants.indexOf(variant)} entities={build.entities} />}
+          {passivesMounted && variant && (
+            <div style={route.tab === 'passives' ? { display: 'contents' } : { display: 'none' }} aria-hidden={route.tab !== 'passives'}>
+              <PassivesPanel
+                variant={variant}
+                sourceVariant={sourceBuild.variants[build.variants.indexOf(variant)] ?? variant}
+                variantIndex={build.variants.indexOf(variant)}
+                active={route.tab === 'passives'}
+                entities={build.entities}
+              />
+            </div>
+          )}
           {route.tab === 'atlas' && variant && <AtlasPanel variant={variant} variantIndex={build.variants.indexOf(variant)} entities={build.entities} />}
           {route.tab === 'progression' && variant && (
             <ProgressionPanel build={build} variant={variant} onSelectVariant={selectVariant} onOpenTab={selectTab} />
           )}
         </section>
       </div>
-    </TooltipProvider></TranslationProvider>
+    </TooltipProvider></ToastProvider></TranslationProvider>
   );
 }
 

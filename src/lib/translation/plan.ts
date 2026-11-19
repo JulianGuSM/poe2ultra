@@ -1,9 +1,15 @@
 import type { Build } from '../build/model';
 
 export type Locale = 'en' | 'cn' | 'tw';
-export interface Segment { kind: 'term' | 'prose'; texts: string[]; protected: number[] }
-export interface Translation { cn: string[]; tw: string[] }
-export interface CachedTranslation extends Translation { source?: string }
+export interface WidgetEntity { index: number; label: string; group: string }
+export interface Segment { kind: 'term' | 'prose'; texts: string[]; protected: number[]; widgetIndices?: number[]; widgetEntities?: WidgetEntity[] }
+export interface Translation { cn: string[]; tw: string[]; widgetLabels?: { index: number; cn: string; tw: string }[] }
+export interface CachedTranslation extends Translation {
+  source?: string;
+  sourceHash?: string;
+  configHash?: string;
+  translatedAt?: string;
+}
 export type Records = Record<string, Translation>;
 type Path = (string | number)[];
 interface Slot { key: string; paths: Path[] }
@@ -21,9 +27,10 @@ const translatable = (text: string) => /[a-z]/i.test(text) && !/^\s*(https?:\/\/
 export function planTranslation(build: Build): TranslationPlan {
   const unique = new Map<string, Segment>();
   const slots: Slot[] = [];
-  function add(texts: string[], paths: Path[], protectedIndices: number[] = [], kind: Segment['kind'] = 'prose') {
+  function add(texts: string[], paths: Path[], protectedIndices: number[] = [], kind: Segment['kind'] = 'prose', widgetIndices: number[] = [], widgetEntities: WidgetEntity[] = []) {
     if (!texts.some((text, i) => !protectedIndices.includes(i) && translatable(text))) return;
-    const segment = { kind, texts, protected: protectedIndices };
+    const segment = { kind, texts, protected: protectedIndices,
+      ...(widgetIndices.length ? { widgetIndices } : {}), ...(widgetEntities.length ? { widgetEntities } : {}) };
     const key = segmentKey(segment);
     unique.set(key, segment);
     slots.push({ key, paths });
@@ -31,18 +38,24 @@ export function planTranslation(build: Build): TranslationPlan {
   function rich(node: unknown, path: Path) {
     if (!object(node)) return;
     if (['paragraph', 'heading', 'listitem'].includes(String(node.type))) {
-      const texts: string[] = [], paths: Path[] = [], protectedIndices: number[] = [];
+      const texts: string[] = [], paths: Path[] = [], protectedIndices: number[] = [], widgetIndices: number[] = [], widgetEntities: WidgetEntity[] = [];
       function inlines(child: unknown, at: Path) {
         if (!object(child)) return;
         if (child.type === 'list') { rich(child, at); return; }
-        const field = child.type === 'static-data-widget' ? 'label' : child.type === 'text' ? 'text' : null;
+        const widget = child.type === 'static-data-widget' && typeof child.id === 'string' && !!child.id && typeof child.label === 'string' && !!child.label;
+        const field = widget ? 'label' : child.type === 'text' ? 'text' : null;
         if (field && typeof child[field] === 'string') {
           if ((Number(child.format) & 16) !== 0 || !translatable(child[field])) protectedIndices.push(texts.length);
+          if (widget) {
+            widgetIndices.push(texts.length);
+            widgetEntities.push({ index: texts.length, label: child.label as string,
+              group: typeof child.groupId === 'string' ? child.groupId : 'other' });
+          }
           texts.push(child[field]); paths.push([...at, field]);
         } else if (Array.isArray(child.children)) child.children.forEach((c, i) => inlines(c, [...at, 'children', i]));
       }
       if (Array.isArray(node.children)) node.children.forEach((c, i) => inlines(c, [...path, 'children', i]));
-      add(texts, paths, protectedIndices);
+      add(texts, paths, protectedIndices, 'prose', widgetIndices, widgetEntities);
     } else if (Array.isArray(node.children)) node.children.forEach((c, i) => rich(c, [...path, 'children', i]));
   }
   function walk(value: unknown, path: Path, field = '') {
@@ -51,7 +64,13 @@ export function planTranslation(build: Build): TranslationPlan {
     } else if (Array.isArray(value)) value.forEach((v, i) => walk(v, [...path, i], field));
     else if (object(value)) {
       if ('root' in value) rich(value.root, [...path, 'root']);
-      else Object.entries(value).forEach(([key, child]) => walk(child, [...path, key], key));
+      else {
+        const isCastTimeStat = value.name === 'Cast Time';
+        Object.entries(value).forEach(([key, child]) => {
+          if (isCastTimeStat && key === 'value') return;
+          walk(child, [...path, key], key);
+        });
+      }
     }
   }
   walk(build, []);

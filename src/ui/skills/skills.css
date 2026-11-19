@@ -1,7 +1,22 @@
 .skills {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+.skills:has(.skills__columns),
+.skills:has(.skills__notes) {
+  height: 100%;
+}
+
+.skills:has(.skills__notes) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
 }
 
 /* Every gem is a button that copies its name, ready to paste into the game's search. */
@@ -23,33 +38,59 @@
   border-radius: 4px;
 }
 
-/* Says the name is on the clipboard, then gets out of the way. The panel is taller than the window, so the
-   note is placed against the window rather than the panel, where it would sit below the fold. */
-.skills__copied {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 1;
-  margin: 0;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 40%);
-  color: var(--text-muted);
-  font-size: 12px;
-  pointer-events: none;
-}
-
 .skills__columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
-@media (max-width: 1000px) {
-  .skills__columns {
+.skills__columns:has(.gem-priority) {
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.skills__columns:has(.gem-priority--collapsed) {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+@container (max-width: 560px) {
+  .skills__columns:has(.gem-priority:not(.gem-priority--collapsed)) {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .skills:has(.skills__notes) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .skills__columns {
+    width: 100%;
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .skills__columns:has(.gem-priority),
+  .skills__columns:has(.gem-priority--collapsed) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+  }
+
+  .gem-priority.glance--collapsed {
+    width: auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .gem-priority--collapsed .glance__rail {
+    height: auto;
+    min-height: 0;
   }
 }
 
@@ -58,9 +99,9 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
 }
 
-/* The last card of the left column (gem priority, or the skill list) takes the height the details column needs. */
 .skills__main > :last-child {
   flex: 1;
 }
@@ -70,6 +111,39 @@
 .skills__notes,
 .gem-priority {
   padding: 12px;
+}
+
+.skills__list {
+  box-sizing: border-box;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.gem-priority {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.gem-priority:not(.gem-priority--collapsed) {
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.gem-priority.glance--collapsed {
+  width: 44px;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.gem-priority--collapsed .glance__rail {
+  height: 100%;
+  min-height: 0;
 }
 
 .skills__heading {
@@ -93,13 +167,23 @@
   margin-bottom: 8px;
 }
 
+.skills__notes {
+  box-sizing: border-box;
+  height: 100%;
+  max-height: 100%;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
+}
+
 /* Numbered top to bottom, column by column, so a 30-gem order stays short. */
 .gem-priority__list {
   margin: 0;
   padding: 0;
   list-style: none;
-  column-gap: 16px;
-  columns: 4 220px;
+  columns: 1;
 }
 
 .gem-priority__row {
@@ -193,7 +277,7 @@
 
 .skill-rows {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin: 0;
   padding: 0;
@@ -250,6 +334,11 @@
   cursor: pointer;
 }
 
+.skill-row > .tooltip-trigger {
+  flex: 1;
+  min-width: 0;
+}
+
 .skill-row__main:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -266,16 +355,34 @@
 
 .skill-row__text {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
 }
 
 .skill-row__name {
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-row__name .bilingual-text--inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0 8px;
+  max-width: 100%;
+}
+
+.skill-row__name .bilingual-text--inline > .translation-text {
+  display: inline;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .86em;
   white-space: nowrap;
 }
 
@@ -366,6 +473,21 @@
   line-height: 24px;
 }
 
+.skill-details__name .bilingual-text--inline {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+
+.skill-details__name .bilingual-text--inline > .translation-text {
+  display: inline;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .82em;
+  white-space: normal;
+}
+
 .skill-details__tags {
   display: flex;
   flex-wrap: wrap;
@@ -376,12 +498,40 @@
 }
 
 .skill-details__tags li {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-muted);
   font-size: 11px;
   line-height: 18px;
+}
+
+.skill-details__tags .bilingual-text--inline {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 0 5px;
+  white-space: nowrap;
+}
+
+.skill-details__tags .bilingual-text--inline > .translation-text,
+.skill-details__tags .bilingual-text--inline .translation-text-row > .translation-text {
+  display: inline;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .82em;
+  white-space: nowrap;
+}
+
+.skill-details__tags .bilingual-text--inline > .translation-text-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .skill-details__stats {
@@ -397,7 +547,14 @@
 }
 
 .skill-details__stats dt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   color: var(--text-muted);
+}
+
+.skill-details__stats .skill-details__stat-translation {
+  font-size: .82em;
 }
 
 .skill-details__stats dd {
@@ -467,6 +624,13 @@
 
 .gem-icon--missing {
   display: inline-block;
+}
+
+@media (max-width: 1000px) {
+  .gem-priority.glance--collapsed {
+    width: auto;
+    height: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

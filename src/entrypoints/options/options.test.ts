@@ -10,7 +10,7 @@ it('loads the original Chinese form with existing settings and saves all advance
     if (message.type === 'translation-settings') return { settings: defaultSettings, count: 42 };
     if (message.type === 'get-settings') return { ok: true, data: { ...defaultSettings, apiKey: 'existing-test-key' } };
     if (message.type === 'save-settings') return { ok: true, data: message.patch };
-    if (message.type === 'glossary-stats') return { ok: true, data: { indexSize: 2245, categories: [], activeSource: 'bundled' } };
+    if (message.type === 'glossary-stats') return { ok: true, data: { indexSize: 4324, categories: [], activeSource: 'bundled' } };
     return { ok: true, data: { entries: 0 } };
   });
   vi.stubGlobal('chrome', { runtime: { sendMessage }, permissions: { contains: async () => true, request: async () => true } });

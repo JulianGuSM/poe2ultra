@@ -1,10 +1,13 @@
 import { FOCUS_ALLOWED_ATTRIBUTE } from '@/lib/page/focus-guard';
+import type { Passive } from '@/lib/build/model';
 import { findTreeSection, findTreeSlot, findVariantSection, selectSiteVariant, type TreeKind } from './site-tree';
 
 export type TreeEmbedStatus = 'loading' | 'ready' | 'missing';
 
 export interface TreeEmbed {
   setVariant(variantIndex: number): void;
+  setActive(active: boolean): void;
+  setPassiveCandidates(passives: Passive[]): void;
   /** Re-reads the site and the placeholder position. */
   sync(): void;
   destroy(): void;
@@ -27,6 +30,9 @@ export function embedSiteTree({
   kind = 'passive-tree',
   placeholder,
   variantIndex,
+  active = true,
+  passiveCandidates = [],
+  onPassiveClick = () => {},
   onStatus,
 }: {
   doc: Document;
@@ -34,9 +40,14 @@ export function embedSiteTree({
   kind?: TreeKind;
   placeholder: HTMLElement;
   variantIndex: number;
+  active?: boolean;
+  passiveCandidates?: Passive[];
+  onPassiveClick?: (passive: Passive, anchor: HTMLElement) => void;
   onStatus: (status: TreeEmbedStatus) => void;
 }): TreeEmbed {
   let wanted = variantIndex;
+  let isActive = active;
+  let candidates = passiveCandidates;
   let status: TreeEmbedStatus | null = null;
   let slot: { element: HTMLElement; style: string | null } | null = null;
   const containers = new Map<HTMLElement, string>();
@@ -129,8 +140,34 @@ export function embedSiteTree({
     if (hashBeforeClick && !win.location.hash) win.history.replaceState(win.history.state, '', hashBeforeClick);
   };
 
+  const passiveAtPointer = () => {
+    if (!slot) return null;
+    const tooltips = [...doc.querySelectorAll<HTMLElement>('[data-tippy-root]')]
+      .filter((tooltip) => tooltip.getClientRects().length > 0);
+    for (const tooltip of tooltips) {
+      const text = (tooltip.querySelector<HTMLElement>('.tippy-content')?.innerText ?? tooltip.innerText ?? '').trim();
+      if (!text) continue;
+      const passive = candidates.find((candidate) => candidate.name && text.includes(candidate.name));
+      if (passive) return { passive, anchor: tooltip };
+    }
+    return null;
+  };
+
+  const selectPassiveFromTree = (event: MouseEvent) => {
+    if (!isActive || !slot || !event.composedPath().includes(slot.element)) return;
+    const found = passiveAtPointer();
+    if (!found) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    onPassiveClick(found.passive, found.anchor);
+  };
+
   const sync = () => {
     if (destroyed) return;
+    if (!isActive) {
+      releaseSlot();
+      return;
+    }
     restoreHash();
     const found = findTreeSection(doc, kind);
     if (!found || found.variantIndex !== wanted) {
@@ -189,6 +226,7 @@ export function embedSiteTree({
     });
   });
   observer.observe(doc.body, { childList: true, subtree: true });
+  doc.addEventListener('click', selectPassiveFromTree, true);
 
   const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => place());
   resizeObserver?.observe(placeholder);
@@ -201,12 +239,22 @@ export function embedSiteTree({
       wanted = index;
       sync();
     },
+    setActive(active) {
+      if (isActive === active) return;
+      isActive = active;
+      if (active) sync();
+      else releaseSlot();
+    },
+    setPassiveCandidates(passives) {
+      candidates = passives;
+    },
     sync,
     destroy() {
       if (destroyed) return;
       destroyed = true;
       stopRetry();
       observer.disconnect();
+      doc.removeEventListener('click', selectPassiveFromTree, true);
       resizeObserver?.disconnect();
       win.removeEventListener('resize', place);
       win.removeEventListener('wheel', preventPageZoom, true);

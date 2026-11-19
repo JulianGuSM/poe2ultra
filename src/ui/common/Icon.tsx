@@ -17,8 +17,10 @@ const STAND_IN = {
   rune: Diamond,
 };
 
-/** Settles once the browser has the picture, and refuses when it has given up on it — a cached refusal included. */
-const decoded = (image: HTMLImageElement) => image.decode();
+/** Detects a cached failure without asking decode() to reject while a lazy request is still pending. */
+const cachedFailure = (image: HTMLImageElement) => image.complete && image.naturalWidth === 0
+  ? Promise.reject(new Error('Image request already failed'))
+  : Promise.resolve();
 
 export interface IconProps {
   src: string | null | undefined;
@@ -27,6 +29,8 @@ export interface IconProps {
   kind?: IconKind;
   /** What to leave behind when there is no picture: a stand-in in its place, or nothing at all. */
   missing?: 'box' | 'none';
+  /** Load above-the-fold images immediately; other images stay lazy by default. */
+  loading?: 'eager' | 'lazy';
   /** How the picture is known to have arrived; injected in tests. */
   check?: (image: HTMLImageElement) => Promise<unknown>;
 }
@@ -36,14 +40,14 @@ export interface IconProps {
  * picture that does not arrive leaves a stand-in of the same size — an item, gem, passive or rune shape — rather
  * than the browser's broken-image mark.
  */
-export function Icon({ src, class: className, alt = '', kind, missing = 'box', check = decoded }: IconProps) {
+export function Icon({ src, class: className, alt = '', kind, missing = 'box', loading = 'lazy', check = cachedFailure }: IconProps) {
   const [failed, setFailed] = useState(false);
   const image = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => setFailed(false), [src]);
 
-  // A refusal the browser already holds arrives before the handler below is attached, so the picture is asked
-  // about once it is on the page as well.
+  // A cached refusal may have completed before onError was attached. Do not use decode() as a probe: it can reject
+  // before a lazy request starts in some browsers, which would hide an image that could still load successfully.
   useEffect(() => {
     const element = image.current;
     if (!element || failed) return;
@@ -64,5 +68,5 @@ export function Icon({ src, class: className, alt = '', kind, missing = 'box', c
     );
   }
 
-  return <img ref={image} class={className} src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />;
+  return <img ref={image} class={className} src={src} alt={alt} loading={loading} onError={() => setFailed(true)} />;
 }

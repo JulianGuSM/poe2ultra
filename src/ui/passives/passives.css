@@ -2,21 +2,54 @@
 .build-view__panel--fill {
   display: flex;
   flex-direction: column;
+  padding-top: 14px;
 }
 
 .passives {
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   min-height: 300px;
 }
 
+.passives--has-notes {
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+}
+
+.passives--priority-collapsed {
+  grid-template-columns: 44px minmax(0, 2fr);
+}
+
+.passives--priority-collapsed.passives--has-notes {
+  grid-template-columns: 44px minmax(0, 2fr) minmax(0, 2fr);
+}
+
 @media (max-width: 1000px) {
   .passives {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 480px auto;
+    grid-template-rows: minmax(140px, 1fr) minmax(480px, 3fr);
+  }
+
+  .passives--has-notes {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(140px, 1fr) minmax(480px, 3fr) minmax(180px, 2fr);
+  }
+
+  .passives--priority-collapsed,
+  .passives--priority-collapsed.passives--has-notes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .passives__priority--collapsed .glance__rail {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .passives__priority--collapsed .glance__rail-title {
+    writing-mode: horizontal-tb;
+    transform: none;
   }
 }
 
@@ -39,23 +72,34 @@
   color: var(--text-muted);
 }
 
-.passives__side {
-  display: flex;
-  flex-direction: column;
+.passives__priority,
+.passives__notes-panel {
+  box-sizing: border-box;
+  min-width: 0;
   min-height: 0;
-  padding: 12px 6px 12px 12px;
+  padding: 12px;
 }
 
-.passives__heading {
+.passives__priority {
   display: flex;
-  gap: 8px;
-  align-items: baseline;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.passives__priority--collapsed {
+  padding: 0;
+}
+
+.passives__priority .glance__header {
+  display: flex;
+  gap: 6px;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  padding-right: 6px;
 }
 
 .passives .card__title {
+  flex: none;
   margin: 0;
   font-size: 15px;
   line-height: 20px;
@@ -73,8 +117,19 @@
   flex-direction: column;
   gap: 10px;
   min-height: 0;
-  padding-right: 6px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.passives__notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
 }
 
 .passives__label {
@@ -202,6 +257,7 @@
 }
 
 .passives__notes {
+  min-height: 0;
   font-size: 13px;
   line-height: 19px;
 }

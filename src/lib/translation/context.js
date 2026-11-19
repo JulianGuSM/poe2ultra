@@ -20,7 +20,7 @@ export async function collectContext(settings, input, signal, suppliedGlossary) 
     glossarySource: '',
     notes: [],
     // 面板要能回答「术语表这次到底干了什么」，所以把状态一并带出去
-    glossary: { enabled: true, source: '', size: 0, matched: 0, categories: [], error: '' },
+    glossary: { enabled: true, source: '', size: 0, matched: 0, error: '' },
   };
   if (settings.glossaryEnabled === false) {
     result.glossary.enabled = false;
@@ -41,17 +41,8 @@ export async function collectContext(settings, input, signal, suppliedGlossary) 
     return result;
   }
 
-  const categories = String(settings.glossaryCategories || '')
-    .split(/[,\s]+/)
-    .map((c) => c.trim())
-    .filter(Boolean);
-  if (categories.length) result.glossary.categories = categories;
-
   try {
-    result.terms = extractTerms(input.text, index, {
-      maxTerms: settings.glossaryMaxTerms,
-      categories: categories.length ? categories : null,
-    });
+    result.terms = extractTerms(input.text, index);
     result.glossary.matched = result.terms.length;
   } catch (err) {
     result.warnings.push(`术语抽取失败：${err?.message || err}`);

@@ -10,6 +10,8 @@
 
 .tooltip {
   position: fixed;
+  inset: auto;
+  margin: 0;
   z-index: 2147483647;
   box-sizing: border-box;
   width: max-content;
@@ -41,7 +43,7 @@
   margin: 0;
 }
 
-.tooltip__body > * + * {
+.tooltip .tooltip__body > * + * {
   margin-top: 8px;
 }
 
@@ -110,7 +112,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0;
+  margin: 4px 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border);
   list-style: none;
 }
 
@@ -144,6 +148,11 @@
 .tooltip__requirements,
 .tooltip__description {
   color: var(--text-muted);
+}
+
+.tooltip__requirements {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .tooltip__section {
@@ -184,10 +193,11 @@
   font-style: italic;
 }
 
-/* Cached Chinese remains visually secondary to game text, but legible in the dark pinned card. */
+/* Keep translated text secondary to the source across every tooltip type. */
 .tooltip .translation-text {
-  color: #d9dde5;
-  font-weight: 500;
+  color: var(--text-muted);
+  font-size: .78em;
+  font-weight: 400;
   font-style: normal;
 }
 
@@ -200,3 +210,59 @@
   color: var(--text-disabled);
   font-size: 11px;
 }
+
+/* Match Mobalytics' item-detail panel when details are opened from its native gear board. */
+.tooltip--native {
+  width: max-content;
+  max-width: min(480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  border: 1px solid #77762c;
+  border-radius: 0;
+  background: #050505;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
+  color: #c8c3d5;
+  font: 14px/1.45 Georgia, 'Times New Roman', serif;
+}
+
+.tooltip--native .tooltip__controls {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  padding: 0;
+}
+
+.tooltip--native .tooltip__close {
+  width: 30px;
+  height: 30px;
+  color: #aaa7b4;
+}
+
+.tooltip--native .tooltip__close svg { width: 20px; height: 20px; }
+.tooltip--native .tooltip__header {
+  display: block;
+  padding: 12px 42px 14px;
+  border-bottom: 1px solid #77762c;
+  background: linear-gradient(180deg, #1a190b 0%, #070704 100%);
+  text-align: center;
+}
+.tooltip--native .tooltip__icon { display: none; }
+.tooltip--native .tooltip__title { color: #ffff76; font: inherit; font-size: 1.45em; line-height: 1.25; letter-spacing: 0.01em; }
+.tooltip--native .tooltip__subtitle { margin-top: 4px; color: #a8a3bd; font: inherit; font-size: 1.05em; }
+.tooltip--native .tooltip__body { padding: 0 0 12px; text-align: center; }
+.tooltip--native .tooltip__body > * + * { margin-top: 0; }
+.tooltip--native .tooltip__body > :not(.tooltip__header) { padding: 9px 6px; border-top: 1px solid #27251b; }
+.tooltip--native .tooltip__tags { justify-content: center; border: 0 !important; }
+.tooltip--native .tooltip__tags li { border-color: #55513c; }
+.tooltip--native .tooltip__stats div { justify-content: center; gap: 8px; }
+.tooltip--native .tooltip__section { border-color: #27251b; }
+.tooltip--native .tooltip__section-title { color: #a8a3bd; font: inherit; font-size: .8em; }
+.tooltip--native .tooltip__section--mod li,
+.tooltip--native .tooltip__section--effect li { color: #9087ff; }
+.tooltip--native .tooltip__section--implicit li { color: #edbd38; }
+.tooltip--native .tooltip__section--muted li,
+.tooltip--native .tooltip__requirements,
+.tooltip--native .tooltip__description { color: #a8a3bd; }
+.tooltip--native .tooltip__flavour { color: #d8c56c; }
+.tooltip--native .tooltip__note { font: 13px/1.4 var(--font); }
+.tooltip--native .translation-text { margin: 3px 0 0; color: #dedbe7; font-size: .78em; line-height: 1.35; }

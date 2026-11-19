@@ -2,7 +2,7 @@ import type { Segment, Translation } from './plan';
 
 // Keep the storage version: old span arrays can be joined and shown below the same source block.
 export const FORMAT_VERSION = 'poe2ultra-dual-v1';
-export const GLOSSARY_VERSION = '2245-884e31a5';
+export const GLOSSARY_VERSION = '4324-04623b62';
 const excerpt = (text: string) => text.replace(/\s+/g, ' ').slice(0, 180);
 /** Extract one complete object surrounded by prose/fences without repairing or inventing its contents. */
 function parseJsonOutput(raw: string): unknown {
@@ -40,10 +40,18 @@ function parseJsonOutput(raw: string): unknown {
 export function parseBatch(raw: string, batch: Segment[]): Translation[] {
   const data = parseJsonOutput(raw);
   const rows = (data as { translations?: unknown })?.translations;
-  if (!Array.isArray(rows) || rows.length !== batch.length) throw new Error('模型返回的文字块不完整，本批未缓存。可以继续翻译缺失内容。');
+  if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).length !== 1 || !Array.isArray(rows)) {
+    const keys = data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data).join(', ') : typeof data;
+    throw new Error(`模型输出结构不符合要求：根对象必须且只能包含 translations 数组（当前顶层内容：${keys || '空对象'}）。本批未缓存。`);
+  }
+  if (rows.length !== batch.length) throw new Error(`模型返回的文字块数量不符：需要 ${batch.length} 条，实际 ${rows.length} 条。本批未缓存。`);
   const result: Translation[] = [];
   for (const row of rows) {
-    if (!row || !Number.isInteger(row.id) || !batch[row.id] || result[row.id]) throw new Error('译文的文字块编号无效或重复，本批未缓存。');
+    if (!row || !Number.isInteger(row.id) || !batch[row.id] || result[row.id]) throw new Error('译文的文字块编号无效、缺失或重复；编号必须与输入段落一致。本批未缓存。');
+    const fields = Object.keys(row);
+    if (fields.some(field => !['id', 'cn', 'tw', 'widget_labels'].includes(field)) || ['id', 'cn', 'tw'].some(field => !fields.includes(field))) {
+      throw new Error(`第 ${row.id + 1} 条译文的字段不符合 schema：每条只能包含 id、cn、tw、widget_labels（无实体时可兼容旧缓存格式），且 id/cn/tw 必填（当前字段：${fields.join(', ')}）。本批未缓存。`);
+    }
     const translated = {} as Translation;
     for (const locale of ['cn', 'tw'] as const) {
       const received: unknown = row[locale];
@@ -55,6 +63,29 @@ export function parseBatch(raw: string, batch: Segment[]): Translation[] {
         throw error;
       }
       translated[locale] = [text];
+    }
+    const segment = batch[row.id]!;
+    const expectedEntities = segment.widgetEntities ?? [];
+    const widgetLabels = row.widget_labels;
+    if (!Array.isArray(widgetLabels)) {
+      if (expectedEntities.length) throw new Error(`第 ${row.id + 1} 条译文缺少 widget_labels，无法将翻译后的实体名称与图标对应。本批未缓存。`);
+    } else {
+      if (widgetLabels.length !== expectedEntities.length) {
+        throw new Error(`第 ${row.id + 1} 条译文的实体名称数量不符：需要 ${expectedEntities.length} 项，实际 ${widgetLabels.length} 项。本批未缓存。`);
+      }
+      translated.widgetLabels = widgetLabels.map((entry: any, index: number) => {
+        const expected = expectedEntities[index]!;
+        const entryFields = entry && typeof entry === 'object' ? Object.keys(entry) : [];
+        if (!entry || entryFields.length !== 3 || entryFields.some(field => !['index', 'cn', 'tw'].includes(field)) ||
+          entry.index !== expected.index || typeof entry.cn !== 'string' || !entry.cn.trim() ||
+          typeof entry.tw !== 'string' || !entry.tw.trim()) {
+          throw new Error(`第 ${row.id + 1} 条译文的第 ${index + 1} 个实体名称无效：必须按输入顺序返回正确 index 及非空 cn/tw 名称。本批未缓存。`);
+        }
+        if (!translated.cn.join('').includes(entry.cn) || !translated.tw.join('').includes(entry.tw)) {
+          throw new Error(`第 ${row.id + 1} 条译文的实体名称未出现在对应完整译文中，无法可靠放置图标。本批未缓存。`);
+        }
+        return { index: entry.index, cn: entry.cn, tw: entry.tw };
+      });
     }
     result[row.id] = translated;
   }
@@ -76,9 +107,16 @@ export function batches(segments: Segment[], maxChars = 3500): Segment[][] {
 export function validateSegments(value: unknown): asserts value is Segment[] {
   if (!Array.isArray(value) || value.length > 12000 || JSON.stringify(value).length > 3_000_000) throw new Error('Guide is too large.');
   for (const s of value) {
+    const widgets = s?.widgetEntities;
+    const validWidgets = widgets === undefined || (Array.isArray(widgets) && Array.isArray(s?.texts) && Array.isArray(s?.widgetIndices) && widgets.length <= 200 && widgets.every((entity: any, index: number) =>
+      entity && Number.isInteger(entity.index) && entity.index >= 0 && entity.index < s.texts.length &&
+      entity.index === s.widgetIndices?.[index] && typeof entity.label === 'string' && !!entity.label.trim() && entity.label.length <= 500 &&
+      typeof entity.group === 'string' && entity.group.length <= 100));
     if (!s || !['term', 'prose'].includes(s.kind) || !Array.isArray(s.texts) || !s.texts.length ||
         s.texts.some((t: unknown) => typeof t !== 'string') || !Array.isArray(s.protected) ||
         s.protected.some((i: unknown) => !Number.isInteger(i) || Number(i) < 0 || Number(i) >= s.texts.length) ||
+        !validWidgets || (s.widgetIndices !== undefined && (!Array.isArray(s.widgetIndices) ||
+          s.widgetIndices.some((i: unknown) => !Number.isInteger(i) || Number(i) < 0 || Number(i) >= s.texts.length))) ||
         JSON.stringify(s).length > 16000) throw new Error('Invalid or oversized paragraph.');
   }
 }

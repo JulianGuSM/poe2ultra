@@ -1,4 +1,3 @@
-import { LogOut } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { PageController, PageMode, PageState } from '@/lib/page/controller';
 import type { RememberedVariant, TabId } from '@/lib/ui/route';
@@ -13,8 +12,6 @@ export interface AppProps {
   /** Tab to open for this build when the address names none; the overview for a build not read yet. */
   lastTab?: TabId;
   onTabChange?: (tab: TabId) => void;
-  glanceCollapsed?: boolean;
-  onGlanceCollapsedChange?: (collapsed: boolean) => void;
   /** The variant this build was last read at, and where to report the reader's pick. */
   lastVariant?: RememberedVariant | null;
   onVariantChange?: (variant: RememberedVariant) => void;
@@ -28,8 +25,6 @@ export function App({
   onHeaderCollapsedChange,
   lastTab,
   onTabChange,
-  glanceCollapsed,
-  onGlanceCollapsedChange,
   lastVariant,
   onVariantChange,
 }: AppProps) {
@@ -59,8 +54,6 @@ export function App({
           onTabChange={onTabChange}
           defaultVariant={lastVariant}
           onVariantChange={onVariantChange}
-          glanceCollapsed={glanceCollapsed}
-          onGlanceCollapsedChange={onGlanceCollapsedChange}
         />
       </div>
     );
@@ -68,19 +61,18 @@ export function App({
 
   return (
     <div class="overlay" role="dialog" aria-label="poe2perfect">
-      <div class="overlay__bar">
-        <span class="overlay__brand">poe2perfect</span>
-        <button type="button" class="icon-button" aria-label="Show original page" title="Show original page" onClick={() => onModeChange('original')}>
-          <LogOut size={16} aria-hidden="true" />
-        </button>
-      </div>
       <main class="overlay__body">
         {state.status === 'loading' ? (
-          <p class="overlay__status" role="status">
-            <span class="spinner" aria-hidden="true" />
-            Loading build…
-            {state.progress && <span class="overlay__progress">The site is slow to answer. Attempt {state.progress.attempt} of {state.progress.attempts}…</span>}
-          </p>
+          <div class="overlay__waiting">
+            <p class="overlay__status" role="status">
+              <span class="spinner" aria-hidden="true" />
+              Loading build…
+              {state.progress && <span class="overlay__progress">The site is slow to answer. Attempt {state.progress.attempt} of {state.progress.attempts}…</span>}
+            </p>
+            <button type="button" class="button" aria-label="Show original page" onClick={() => onModeChange('original')}>
+              Show original page
+            </button>
+          </div>
         ) : (
           <div class="notice" role="alert">
             <p class="notice__title">Couldn't show this build</p>
@@ -120,8 +112,8 @@ export interface ConnectedAppProps {
   initialLastTabs?: Record<string, TabId>;
   /** Persists the tab this build is now read at. */
   onLastTabChange?: (buildSlug: string, tab: TabId) => void;
+  /** Legacy persisted preference; accepted but no longer used because At a Glance was removed. */
   initialGlanceCollapsed?: boolean;
-  /** Persists whether At a Glance on the Overview tab is collapsed. */
   onGlanceCollapsedChange?: (collapsed: boolean) => void;
   /** The variant each build was last read at, by build slug. */
   initialLastVariants?: Record<string, RememberedVariant>;
@@ -135,15 +127,12 @@ export function ConnectedApp({
   onHeaderCollapsedChange,
   initialLastTabs = {},
   onLastTabChange,
-  initialGlanceCollapsed = false,
-  onGlanceCollapsedChange,
   initialLastVariants = {},
   onVariantChange,
 }: ConnectedAppProps) {
   const [state, setState] = useState(controller.getState());
   const [headerCollapsed, setHeaderCollapsed] = useState(initialHeaderCollapsed);
   const [lastTabs, setLastTabs] = useState(initialLastTabs);
-  const [glanceCollapsed, setGlanceCollapsed] = useState(initialGlanceCollapsed);
   const [lastVariants, setLastVariants] = useState(initialLastVariants);
   const buildSlug = state.active ? state.slug : null;
 
@@ -155,11 +144,6 @@ export function ConnectedApp({
   const changeHeaderCollapsed = (collapsed: boolean) => {
     setHeaderCollapsed(collapsed);
     onHeaderCollapsedChange(collapsed);
-  };
-
-  const changeGlanceCollapsed = (collapsed: boolean) => {
-    setGlanceCollapsed(collapsed);
-    onGlanceCollapsedChange?.(collapsed);
   };
 
   const changeTab = (tab: TabId) => {
@@ -183,8 +167,6 @@ export function ConnectedApp({
       onHeaderCollapsedChange={changeHeaderCollapsed}
       lastTab={buildSlug ? lastTabs[buildSlug] : undefined}
       onTabChange={changeTab}
-      glanceCollapsed={glanceCollapsed}
-      onGlanceCollapsedChange={changeGlanceCollapsed}
       lastVariant={buildSlug ? lastVariants[buildSlug] : null}
       onVariantChange={changeVariant}
     />

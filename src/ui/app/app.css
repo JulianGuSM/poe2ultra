@@ -37,26 +37,22 @@
   font: 14px/20px var(--font);
 }
 
-.overlay__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-.overlay__brand {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .overlay__body {
+  display: grid;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  place-items: center;
   padding: 24px;
+}
+
+.overlay__waiting {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 100%;
+  align-content: center;
 }
 
 .overlay__status {
@@ -65,7 +61,6 @@
   gap: 10px;
   align-items: center;
   justify-content: center;
-  height: 100%;
   margin: 0;
   color: var(--text-muted);
 }

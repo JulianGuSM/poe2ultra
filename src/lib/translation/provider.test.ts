@@ -67,8 +67,8 @@ describe('existing translator integration', () => {
     expect(activity.mock.calls.map(([event]) => event.stage)).toEqual(['glossary', 'context', 'requesting', 'reasoning', 'receiving', 'validating']);
   });
   it('ships all the original independently sourced terminology entries', () => {
-    const data = JSON.parse(readFileSync('public/data/glossary.json', 'utf8'));
-    expect(data.entries).toHaveLength(2245);
+    const data = JSON.parse(readFileSync('public/data/poe2_terms.json', 'utf8'));
+    expect(data.entries).toHaveLength(4324);
     expect(data.entries.find((e: { e: string }) => e.e === 'Abyssal Lich')).toMatchObject({ c: '深渊巫妖', t: '深淵妖巫' });
   });
   it('honors advanced request settings while retaining the full-page protocol', async () => {

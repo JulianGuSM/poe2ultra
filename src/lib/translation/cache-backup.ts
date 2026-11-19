@@ -8,8 +8,8 @@ export const CACHE_BACKUP_KIND = 'poe2ultra-translation-cache';
 export const CACHE_BACKUP_VERSION = 1;
 export const CACHE_BACKUP_MAX_BYTES = 50 * 1024 * 1024;
 const SETTINGS_KEYS = ['apiMode', 'model', 'thinkingMode', 'glossaryEnabled', 'poe2dbDirectEnabled', 'tavilyEnabled',
-  'baseUrl', 'temperature', 'maxTokens', 'reasoningEffort', 'glossaryMaxTerms', 'glossaryCategories', 'glossaryStrict',
-  'poe2dbLocales', 'poe2dbMaxTerms', 'poe2dbRequestBudget', 'tavilyMaxResults', 'tavilyDomains', 'customBody'] as const;
+  'baseUrl', 'temperature', 'maxTokens', 'reasoningEffort',
+  'poe2dbLocales', 'poe2dbMaxTerms', 'poe2dbRequestBudget', 'tavilyMaxResults', 'tavilyDomains', 'customBody', 'customTermAliases'] as const;
 type BackupSettings = Pick<Settings, typeof SETTINGS_KEYS[number]>;
 type GlossaryOverride = { entries: unknown[]; meta?: object } | null;
 export interface CacheBackup {
@@ -62,8 +62,21 @@ export function validateCacheBackup(value: unknown): CacheBackup {
       translation[locale].every((part: unknown) => typeof part === 'string') && translation[locale].join('').trim())) {
       throw new Error('备份包含不完整的简中或繁中译文。');
     }
+    if (translation.widgetLabels !== undefined && (!Array.isArray(translation.widgetLabels) || translation.widgetLabels.length > 200 ||
+      !translation.widgetLabels.every((item: unknown) => object(item) && typeof item.index === 'number' && Number.isInteger(item.index) && item.index >= 0 &&
+        typeof item.cn === 'string' && !!item.cn.trim() && item.cn.length <= 500 &&
+        typeof item.tw === 'string' && !!item.tw.trim() && item.tw.length <= 500))) {
+      throw new Error('备份包含无效的富文本实体译名。');
+    }
     if (translation.source !== undefined && (typeof translation.source !== 'string' || !translation.source.trim() || translation.source.length > 100000)) {
       throw new Error('备份包含无效的英文原文。');
+    }
+    const invalidCacheMetadata =
+      (translation.sourceHash !== undefined && (typeof translation.sourceHash !== 'string' || !/^[a-f0-9]{64}$/.test(translation.sourceHash))) ||
+      (translation.configHash !== undefined && (typeof translation.configHash !== 'string' || !/^[a-f0-9]{64}$/.test(translation.configHash))) ||
+      (translation.translatedAt !== undefined && (typeof translation.translatedAt !== 'string' || !Number.isFinite(Date.parse(translation.translatedAt))));
+    if (invalidCacheMetadata) {
+      throw new Error('备份包含无效的缓存哈希或译文时间。');
     }
   }
   if (value.guideCosts !== undefined) {

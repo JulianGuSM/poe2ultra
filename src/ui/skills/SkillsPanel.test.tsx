@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/ui/tooltip/Tooltip';
 import { loadFixture } from '../../../tests/fixtures/load';
 import { SkillsPanel } from './SkillsPanel';
 import { TranslationProvider } from '@/ui/translation/BilingualText';
+import { ToastProvider } from '@/ui/common/Toast';
 
 const fixture = loadFixture('chaos-dot-lich-starter-deadrabbit');
 const BUILD: Build = parseBuild(fixture.build, fixture.staticData);
@@ -13,10 +14,12 @@ const ENDGAME = BUILD.variants.find((v) => v.title === 'ENDGAME (FULL LIFE)')!;
 
 function renderPanel(variant: Variant = ENDGAME, copy = vi.fn(async () => true)) {
   const view = render(
-    <TooltipProvider>
+    <ToastProvider><TooltipProvider>
       <SkillsPanel variant={variant} entities={BUILD.entities} copy={copy} />
-    </TooltipProvider>,
+    </TooltipProvider></ToastProvider>,
   );
+  const expandPriority = screen.queryByRole('button', { name: 'Expand Gem Priority' });
+  if (expandPriority) fireEvent.click(expandPriority);
   return { ...view, copy };
 }
 
@@ -33,6 +36,7 @@ describe('SkillsPanel', () => {
         <TooltipProvider><SkillsPanel variant={variant} entities={BUILD.entities} /></TooltipProvider>
       </TranslationProvider>,
     );
+    fireEvent.click(skillButton(first.gem.name));
     expect(screen.getByText('品质附加效果')).toBeTruthy();
     expect(screen.queryByText('Additional Effects From Quality')).toBeNull();
   });
@@ -68,13 +72,14 @@ describe('SkillsPanel', () => {
     expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe(name);
   });
 
-  it('copies the name of the gem shown in the details, and of its supports', () => {
+  it('copies the name of the active skill and of its supports', () => {
     const { copy } = renderPanel();
 
-    fireEvent.click(within(details()).getByRole('button', { name: 'Copy “Essence Drain”' }));
+    fireEvent.click(skillButton('Essence Drain'));
     expect(copy).toHaveBeenCalledWith('Essence Drain');
 
-    fireEvent.click(within(details()).getByRole('button', { name: 'Copy “Chain II”' }));
+    const row = skillButton('Essence Drain').closest('li')!;
+    fireEvent.click(within(row).getByRole('button', { name: 'Copy “Chain II”' }).querySelector('.skill-row__support')!);
     expect(copy).toHaveBeenLastCalledWith('Chain II');
     expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Chain II');
   });
@@ -87,14 +92,14 @@ describe('SkillsPanel', () => {
     expect((await screen.findByRole('status')).textContent).toBe("Couldn't copy the name");
   });
 
-  it('lists the active skills with their tags, the first one selected', () => {
+  it('lists active skills without repeating tooltip tags, with the first one selected', () => {
     renderPanel();
 
     const buttons = [...skillList().querySelectorAll('.skill-row__main')];
     expect(buttons.map((b) => b.querySelector('.skill-row__name')?.textContent)).toEqual(ENDGAME.skills.map((s) => s.gem.name));
     expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('false');
-    expect(buttons[0]?.querySelector('.skill-row__tags')?.textContent).toBe('Spell · Projectile · Chaos · Duration · Repeatable');
+    expect(buttons[0]?.querySelector('.skill-row__tags')).toBeNull();
   });
 
   it('shows support gem icons on each row, with tooltips', () => {
@@ -110,33 +115,29 @@ describe('SkillsPanel', () => {
     expect(tooltip.textContent).toContain('Support Gem');
   });
 
-  it('describes the selected skill', () => {
+  it('shows bilingual details in a dismissible tooltip when an active skill is clicked', () => {
     renderPanel();
 
-    const panel = within(details());
-    expect(panel.getByRole('heading', { level: 2, name: 'Essence Drain' })).toBeTruthy();
-    expect(panel.getByText('Mana Range')).toBeTruthy();
-    expect(panel.queryByText('Cast Time')).toBeNull();
-    expect(details().textContent).toContain('Requires: Level');
-    expect(details().querySelector('.skill-details__description')?.textContent).toMatch(/\w+/);
-    expect(details().querySelectorAll('.skill-details__effects li').length).toBeGreaterThan(0);
-    expect([...details().querySelectorAll('.skill-details__support-name')].map((el) => el.textContent)).toEqual([
-      'Chain II',
-      'Swift Affliction II',
-      'Rapid Casting II',
-      'Intense Agony',
-      'Chaos Mastery',
-    ]);
+    fireEvent.click(skillButton('Essence Drain'));
+    const tooltip = screen.getByRole('dialog');
+    expect(tooltip.querySelector('.tooltip__title')?.textContent).toBe('Essence Drain');
+    expect(tooltip.textContent).toContain('Mana Range');
+    expect(tooltip.textContent).toContain('Requires: Level');
+    expect(tooltip.querySelector('.tooltip__description')?.textContent).toMatch(/\w+/);
+    expect(tooltip.querySelectorAll('.tooltip__section li').length).toBeGreaterThan(0);
+    fireEvent.click(within(tooltip).getByRole('button', { name: /Close details/ }));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('switches the details to a clicked skill', () => {
+  it('opens the clicked skill details without adding a details column', () => {
     renderPanel();
 
     fireEvent.click(skillButton('Contagion'));
 
     expect(skillButton('Contagion').getAttribute('aria-pressed')).toBe('true');
-    expect(within(details()).getByRole('heading', { level: 2, name: 'Contagion' })).toBeTruthy();
-    expect(details().querySelector('.skill-details__tags')?.textContent).toContain('Duration');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe('Contagion');
+    expect(screen.getByRole('dialog').querySelector('.tooltip__tags')?.textContent).toContain('Duration');
+    expect(document.querySelector('.skill-details')).toBeNull();
   });
 
   it('shows the attributes the gems require', () => {
@@ -209,11 +210,12 @@ describe('SkillsPanel', () => {
     expect(container.querySelector('.skills__columns')!.contains(notes)).toBe(false);
   });
 
-  it('explains a gem without static data', () => {
+  it('opens a tooltip for a gem without static detail data', () => {
     const bare: Variant = { ...ENDGAME, skills: ENDGAME.skills.map((s) => ({ gem: { ...s.gem, details: null }, supports: [] })) };
     renderPanel(bare);
 
-    expect(within(details()).getByText('No details available for this gem.')).toBeTruthy();
+    fireEvent.click(skillButton(bare.skills[0]!.gem.name));
+    expect(screen.getByRole('dialog').querySelector('.tooltip__title')?.textContent).toBe(bare.skills[0]!.gem.name);
   });
 
   it('explains a variant without skills', () => {

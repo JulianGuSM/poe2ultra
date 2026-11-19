@@ -1,14 +1,14 @@
 /**
  * 本地 POE2 术语表：加载、索引、从原文里抽取命中的术语。
  *
- * 数据来源是打包进扩展的 data/glossary.json（由 tools/build-glossary.mjs 从
- * 上游 JSONL 生成）；用户在设置页导入的术语表会存进 chrome.storage.local，
+ * 数据来源是打包进扩展的 data/poe2_terms.json（由 data/poe2_terms.csv 生成）；
+ * 用户在设置页导入的术语表会存进 chrome.storage.local，
  * 优先级高于内置数据。
  *
  * buildIndex / extractTerms / compactRows 都是纯函数，Node 里可直接测。
  */
 
-export const GLOSSARY_URL = 'data/glossary.json';
+export const GLOSSARY_URL = 'data/poe2_terms.json';
 export const OVERRIDE_KEY = 'glossaryOverride';
 
 /* --------------------------------------------------------------- 打包 */
@@ -87,6 +87,75 @@ export function parseGlossaryText(text) {
   return parseJsonl(trimmed);
 }
 
+/** Parse the upstream POE2 CSV format, yielding periodically so the options page can report progress. */
+export async function parseGlossaryCsv(text, onProgress = () => {}) {
+  const source = String(text ?? '').replace(/^\uFEFF/, '');
+  if (!source.trim()) throw new Error('文件是空的');
+
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  const chunkSize = 64 * 1024;
+
+  for (let start = 0; start < source.length; start += chunkSize) {
+    const end = Math.min(start + chunkSize, source.length);
+    for (let i = start; i < end; i++) {
+      const char = source[i];
+      if (quoted) {
+        if (char === '"' && source[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else if (char === '"') {
+          quoted = false;
+        } else {
+          cell += char;
+        }
+      } else if (char === '"' && cell === '') {
+        quoted = true;
+      } else if (char === ',') {
+        row.push(cell);
+        cell = '';
+      } else if (char === '\n' || char === '\r') {
+        if (char === '\r' && source[i + 1] === '\n') i++;
+        row.push(cell);
+        if (row.some(value => value !== '')) rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += char;
+      }
+    }
+    onProgress(Math.round((end / source.length) * 100));
+    if (end < source.length) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  if (quoted) throw new Error('CSV 中有未闭合的引号字段');
+  if (cell !== '' || row.length) {
+    row.push(cell);
+    if (row.some(value => value !== '')) rows.push(row);
+  }
+  if (!rows.length) throw new Error('CSV 中没有术语行');
+
+  const headers = rows.shift().map(value => value.trim());
+  const required = ['term_id', 'en', 'zh_cn', 'zh_tw', 'category', 'quality'];
+  const indexes = Object.fromEntries(required.map(name => [name, headers.indexOf(name)]));
+  if (required.some(name => indexes[name] < 0)) {
+    throw new Error(`CSV 缺少必需列：${required.join(', ')}`);
+  }
+
+  const ids = new Set();
+  return rows.map((values, index) => {
+    const value = Object.fromEntries(required.map(name => [name, values[indexes[name]] ?? '']));
+    if (!value.term_id || !value.en || (!value.zh_cn && !value.zh_tw)) {
+      throw new Error(`CSV 第 ${index + 2} 行缺少术语 ID、英文原文或中文译名`);
+    }
+    if (ids.has(value.term_id)) throw new Error(`CSV 第 ${index + 2} 行的 term_id 重复：${value.term_id}`);
+    ids.add(value.term_id);
+    return value;
+  });
+}
+
 function parseJsonl(trimmed) {
   const rows = [];
   const lines = trimmed.split(/\r?\n/);
@@ -137,7 +206,7 @@ function tokenize(text) {
  * @returns {{en:Map, maxWords:number, size:number, collisions:number}}
  *          collisions = 英文写法相同但属于不同条目的数量（英译中会取先出现的一条）
  */
-export function buildIndex(glossary) {
+export function buildIndex(glossary, aliases = []) {
   const entries = Array.isArray(glossary?.entries)
     ? glossary.entries
     : Array.isArray(glossary)
@@ -157,7 +226,17 @@ export function buildIndex(glossary) {
     }
   }
 
+  // User aliases point back to an official English term. Keep the official row as
+  // the indexed value so prompts always receive its canonical spelling/translations.
+  for (const item of aliases || []) {
+    const alias = normalize(item?.alias);
+    const canonical = normalize(item?.canonical);
+    const entry = en.get(canonical);
+    if (alias && canonical && entry) en.set(alias, entry);
+  }
+
   const meta = describeIndex(entries);
+  for (const key of en.keys()) meta.maxEnWords = Math.min(8, Math.max(meta.maxEnWords, key.split(' ').filter(Boolean).length));
   return { en, maxWords: meta.maxEnWords, size: entries.length, collisions };
 }
 
@@ -199,17 +278,14 @@ export function wordVariants(word) {
  *
  * @param {string} text
  * @param {object} index buildIndex 的结果
- * @param {{maxTerms?:number, categories?:string[]|null, minEnLength?:number}} options
+ * @param {{minEnLength?:number}} options
  */
 export function extractTerms(text, index, options = {}) {
-  const maxTerms = Math.max(1, Number(options.maxTerms) || 20);
-  const categories = options.categories?.length ? new Set(options.categories) : null;
   const minEnLength = Number(options.minEnLength) || 3;
   const normalized = normalize(text);
   const hits = new Map(); // term_id -> hit
 
   const accept = (entry, matched, at) => {
-    if (categories && !categories.has(entry.k)) return;
     const id = entry.i || `${entry.e}|${entry.c}`;
     const prev = hits.get(id);
     if (!prev || matched.length > prev.matched.length) {
@@ -254,7 +330,6 @@ export function extractTerms(text, index, options = {}) {
 
   return [...hits.values()]
     .sort((a, b) => b.matched.length - a.matched.length || a.at - b.at)
-    .slice(0, maxTerms)
     .sort((a, b) => a.at - b.at)
     .map((hit) => ({
       id: hit.entry.i,

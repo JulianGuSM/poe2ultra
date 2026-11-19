@@ -57,7 +57,7 @@ export function parseBuild(doc: RawBuildDocument, staticData: RawStaticData | nu
     variants,
     // The site opens the first variant; its "default-variant" id is just the oldest one.
     defaultVariantId: variants[0]?.id ?? null,
-    questRewards: parseQuestRewards(doc.data.questRewards),
+    questRewards: parseQuestRewards(doc.data.questRewards, index),
     entities: resolveEntities(labels, index),
     hasStaticData: index.available,
   };

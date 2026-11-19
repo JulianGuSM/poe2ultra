@@ -17,15 +17,21 @@ export class PersistentCache implements TranslationStore {
   private database?: Promise<IDBDatabase>;
   private open() {
     return this.database ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('poe2ultra-translations', 3);
+      const request = indexedDB.open('poe2ultra-translations', 4);
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains('segments')) request.result.createObjectStore('segments');
+        const segments = request.transaction!.objectStore('segments');
+        if (!segments.indexNames.contains('source')) segments.createIndex('source', 'source', { unique: false });
         if (!request.result.objectStoreNames.contains('selections')) request.result.createObjectStore('selections');
         if (!request.result.objectStoreNames.contains('guide-costs')) {
           request.result.createObjectStore('guide-costs', { keyPath: 'id' }).createIndex('guideKey', 'guideKey');
         }
       };
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {
+        const db = request.result;
+        db.onversionchange = () => { db.close(); this.database = undefined; };
+        resolve(db);
+      };
       request.onerror = () => { this.database = undefined; reject(request.error); };
     });
   }
@@ -41,6 +47,19 @@ export class PersistentCache implements TranslationStore {
   }
   get(key: string) { return this.request<CachedTranslation | undefined>('readonly', s => s.get(key)); }
   async put(key: string, value: CachedTranslation) { await this.request('readwrite', s => s.put(value, key)); }
+  async findBySource(source: string): Promise<[string, CachedTranslation][]> {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('segments', 'readonly');
+      const index = tx.objectStore('segments').index('source');
+      const range = IDBKeyRange.only(source);
+      const keys = index.getAllKeys(range);
+      const values = index.getAll(range);
+      tx.oncomplete = () => resolve(keys.result.map((key, i) => [String(key), values.result[i] as CachedTranslation]));
+      tx.onabort = () => reject(tx.error ?? new Error('无法按原文读取译文缓存。'));
+      tx.onerror = () => reject(tx.error);
+    });
+  }
   async annotate(key: string, source: string): Promise<void> {
     await this.annotateMany([[key, source]]);
   }

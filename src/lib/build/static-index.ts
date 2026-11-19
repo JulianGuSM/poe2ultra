@@ -1,5 +1,6 @@
 import { type Obj, obj, objs, str } from '@/lib/data/coerce';
 import type { RawStaticData } from '@/lib/data/types';
+import type { QuestRewardCategory } from './model';
 
 export type StaticEntry = Obj;
 
@@ -14,6 +15,7 @@ export interface StaticIndex {
   passive(slug: string): StaticEntry | null;
   passiveSlugOfNode(nodeSlug: string): string | null;
   passiveOfNode(nodeSlug: string): StaticEntry | null;
+  questCategories(name: string, act: string): QuestRewardCategory[];
 }
 
 const ITEM_CATEGORIES = [
@@ -51,6 +53,7 @@ export function createStaticIndex(staticData: RawStaticData | null): StaticIndex
   const socketables = bySlug('poe2SoulCores');
   const affixes = bySlug('poe2Prefixes', 'poe2Suffixes');
   const passives = bySlug('poe2PassiveSkills');
+  const quests = objs(obj(staticData?.poe2Quests)?.data);
 
   const nodeToPassive = new Map<string, string>();
   for (const tree of objs(obj(staticData?.poe2PassiveSkillsGraph)?.data)) {
@@ -64,6 +67,16 @@ export function createStaticIndex(staticData: RawStaticData | null): StaticIndex
   }
 
   const find = (map: Map<string, StaticEntry>) => (slug: string) => map.get(slug) ?? null;
+  const questCategories = (name: string, act: string): QuestRewardCategory[] => {
+    const normalizedName = name.trim().toLocaleLowerCase();
+    const entry = quests.find((quest) => str(quest.name)?.trim().toLocaleLowerCase() === normalizedName && str(quest.act)?.trim().toLocaleLowerCase() === act.trim().toLocaleLowerCase());
+    if (!entry || !Array.isArray(entry.tags)) return [];
+    const valid = new Set<QuestRewardCategory>(['choices', 'skill-points', 'character-upgrades']);
+    return [...new Set(entry.tags.flatMap((tag) => {
+      const value = typeof tag === 'string' ? tag : str(obj(tag)?.slug) ?? str(obj(tag)?.name);
+      return value && valid.has(value as QuestRewardCategory) ? [value as QuestRewardCategory] : [];
+    }))];
+  };
 
   return {
     available: staticData !== null,
@@ -78,5 +91,6 @@ export function createStaticIndex(staticData: RawStaticData | null): StaticIndex
       const passiveSlug = nodeToPassive.get(nodeSlug);
       return passiveSlug ? (passives.get(passiveSlug) ?? null) : null;
     },
+    questCategories,
   };
 }

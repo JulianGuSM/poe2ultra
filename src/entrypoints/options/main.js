@@ -7,27 +7,28 @@ import { getSettings, saveSettings, resetSettings, maskKey } from './store.js';
 import { buildEndpoint, endpointOrigin } from '../../lib/translation/vendor/api-base.js';
 import { buildBody as buildChatBody } from '../../lib/translation/vendor/deepseek.js';
 import { buildBody as buildResponsesBody } from '../../lib/translation/vendor/responses.js';
-import { compactRows, parseGlossaryText } from '../../lib/translation/vendor/glossary.js';
-import { PRICE_TABLE, resolveRates } from '../../lib/translation/vendor/pricing.js';
+import { compactRows, parseGlossaryCsv, parseGlossaryText } from '../../lib/translation/vendor/glossary.js';
 import { initDebugPanel } from './debug.js';
 import { CACHE_BACKUP_MAX_BYTES, validateCacheBackup } from '../../lib/translation/cache-backup';
+import { sitePermissionOrigins } from '../../lib/selection/site-patterns';
 
 const $ = (id) => document.getElementById(id);
 
 const CHECKBOXES = [
-  'stream', 'showButton', 'autoTranslate', 'keepSource', 'autoClosePanel', 'showPrompt',
-  'showCost', 'costAutoPeak', 'dualOutput', 'debugEnabled',
-  'glossaryEnabled', 'glossaryStrict', 'showContext', 'poe2dbDirectEnabled', 'tavilyEnabled',
+  'showButton', 'autoTranslate', 'keepSource', 'autoClosePanel', 'showPrompt',
+  'dualOutput', 'debugEnabled',
+  'showContext', 'poe2dbDirectEnabled', 'tavilyEnabled',
 ];
 const TEXTS = [
   'apiKey', 'baseUrl', 'model', 'targetLang', 'systemPrompt', 'userPrompt',
   'extraHeaders', 'customBody', 'chinaTradeLeague',
-  'glossaryCategories', 'tavilyApiKey', 'tavilyDomains', 'poe2dbLocales',
+  'tavilyApiKey', 'tavilyDomains', 'poe2dbLocales',
+  'customTermAliases',
+  'selectionMatchPatterns',
 ];
 const NUMBERS = [
   'temperature', 'maxTokens', 'panelWidth', 'maxChars',
-  'priceCacheHit', 'priceCacheMiss', 'priceOutput',
-  'glossaryMaxTerms', 'tavilyMaxResults', 'poe2dbMaxTerms', 'poe2dbRequestBudget',
+  'tavilyMaxResults', 'poe2dbMaxTerms', 'poe2dbRequestBudget',
 ];
 
 /** 模式说明里用到的端点，供界面提示与预览共用。 */
@@ -66,18 +67,26 @@ function collectForm() {
   for (const id of CHECKBOXES) patch[id] = $(id).checked;
   for (const id of NUMBERS) patch[id] = Number($(id).value);
   patch.theme = $('theme').value;
-  patch.costModel = $('costModel').value;
   patch.thinkingMode = $('thinkingMode').value;
   patch.reasoningEffort = $('reasoningEffort').value;
   patch.apiMode = $('apiMode').value;
   patch.timeoutMs = Math.round(Number($('timeoutSec').value) * 1000);
+  patch.advancedSettingsEnabled = $('btn-enable-advanced').getAttribute('aria-pressed') === 'true';
 
   // 数值兜底，避免用户清空输入框后存进 NaN
-  for (const key of ['temperature', 'maxTokens', 'panelWidth', 'maxChars', 'timeoutMs',
-    'priceCacheHit', 'priceCacheMiss', 'priceOutput', 'glossaryMaxTerms', 'tavilyMaxResults']) {
+  for (const key of ['temperature', 'maxTokens', 'panelWidth', 'maxChars', 'timeoutMs', 'tavilyMaxResults']) {
     if (!Number.isFinite(patch[key])) patch[key] = DEFAULTS[key];
   }
   return patch;
+}
+
+function syncTargetLanguageControl() {
+  const value = $('targetLang').value || '简体中文';
+  $('targetLangLabel').textContent = value;
+  $('targetLangTrigger').disabled = $('dualOutput').checked;
+  for (const option of document.querySelectorAll('[data-target-lang]')) {
+    option.setAttribute('aria-selected', String(option.dataset.targetLang === value));
+  }
 }
 
 function fillForm(s) {
@@ -85,13 +94,13 @@ function fillForm(s) {
   for (const id of CHECKBOXES) $(id).checked = Boolean(s[id]);
   for (const id of NUMBERS) $(id).value = s[id];
   $('theme').value = s.theme;
-  $('costModel').value = s.costModel;
   $('thinkingMode').value = s.thinkingMode;
   $('reasoningEffort').value = s.reasoningEffort;
   $('apiMode').value = s.apiMode;
   $('timeoutSec').value = Math.round((s.timeoutMs || 90000) / 1000);
+  setAdvancedSettingsEnabled(Boolean(s.advancedSettingsEnabled));
+  syncTargetLanguageControl();
   renderKeyState(s.apiKey);
-  renderCostState();
   renderThinkingState();
   renderApiModeState();
   renderTermState();
@@ -127,7 +136,6 @@ function renderApiModeState() {
 function renderThinkingState() {
   const mode = $('thinkingMode').value;
   const thinkingOn = mode !== 'disabled';
-
   $('reasoningEffort').disabled = mode !== 'enabled';
   $('reasoningEffort').style.opacity = mode === 'enabled' ? '1' : '.55';
 
@@ -154,6 +162,17 @@ function renderThinkingState() {
     : '非思考模式下生效；DeepSeek 早期文档对翻译场景建议 1.3。';
 }
 
+function setAdvancedSettingsEnabled(enabled) {
+  const button = $('btn-enable-advanced');
+  if (!button) return;
+  button.setAttribute('aria-pressed', String(enabled));
+  button.textContent = enabled ? '关闭高阶设置' : '开启高阶设置';
+  for (const panel of document.querySelectorAll('[data-advanced-controls]')) {
+    panel.setAttribute('aria-disabled', String(!enabled));
+    panel.inert = !enabled;
+  }
+}
+
 /** 术语表 + Tavily 的状态展示。 */
 async function renderTermState() {
   const s = collectForm();
@@ -162,15 +181,7 @@ async function renderTermState() {
     const res = await chrome.runtime.sendMessage({ type: 'glossary-stats' });
     if (res?.ok) {
       const d = res.data;
-      const cats = (d.categories || []).slice(0, 6).map((c) => `${c.category}(${c.count})`).join(' · ');
-      const notes = [];
-      if (d.collisions) notes.push(`英文同名 ${d.collisions} 处（会取先出现的一条，建议核对）`);
-
-      stats.textContent =
-        `当前生效：${d.activeSource === 'imported' ? '已导入的自定义术语表' : '内置术语表'} · ${d.indexSize} 条` +
-        (d.imported ? ` · 导入版本 ${d.imported.count} 条${d.imported.importedAt ? `（${d.imported.importedAt.slice(0, 10)}）` : ''}` : '') +
-        (notes.length ? ` · ${notes.join('；')}` : '');
-      $('glossary-categories').textContent = cats ? `现有分类：${cats}…` : '';
+      stats.textContent = `当前术语库版本：${d.version}`;
     }
   } catch {
     stats.textContent = '术语表状态读取失败。';
@@ -200,28 +211,205 @@ async function renderTermState() {
   }
 }
 
-/** 展示当前生效的单价，并只在「自定义单价」时启用三个输入框。 */
-function renderCostState() {
-  const model = $('costModel').value;
-  const custom = model === 'custom';
-  for (const id of ['priceCacheHit', 'priceCacheMiss', 'priceOutput']) {
-    $(id).disabled = !custom;
-    $(id).style.opacity = custom ? '1' : '.55';
-  }
-  $('custom-prices').style.display = custom ? '' : 'none';
+let canonicalGlossaryTerms = [];
+let selectedCustomCanonical = null;
+let customTermDialogMode = 'add';
+function customAliasRows() {
+  const rows = JSON.parse($('customTermAliases').value || '[]');
+  if (!Array.isArray(rows)) throw new Error('映射内容必须是 JSON 数组。');
+  return rows;
+}
 
-  const rates = resolveRates(collectForm(), new Date());
-  const state = $('cost-state');
-  if (rates.key === 'custom') {
-    state.className = 'hint';
-    state.textContent = '使用下面填写的自定义单价。';
-  } else {
-    const table = PRICE_TABLE[rates.key];
-    state.className = 'hint';
-    state.textContent =
-      `当前生效：${rates.label} · ${rates.peak ? '高峰' : '空闲'}时段 · ` +
-      `输入命中 ¥${rates.hit} / 未命中 ¥${rates.miss} / 输出 ¥${rates.out}（元/百万 tokens）` +
-      (table?.note ? ` · ${table.note}` : '');
+function completeCustomAlias(row) {
+  const canonical = canonicalGlossaryTerms.find(term => term.en.toLowerCase() === String(row.canonical || '').toLowerCase());
+  return {
+    canonical: row.canonical || '',
+    alias: row.alias || '',
+    cn: row.cn || canonical?.cn || '',
+    tw: row.tw || canonical?.tw || '',
+  };
+}
+
+function renderCustomTermAliases() {
+  const list = $('customTermAliasList');
+  list.replaceChildren();
+  let rows;
+  try { rows = customAliasRows(); } catch (error) { list.textContent = `自定义术语 JSON 格式有误：${error.message}`; return; }
+  if (!rows.length) {
+    list.textContent = '尚未添加自定义术语。';
+    return;
+  }
+  for (const [index, row] of rows.entries()) {
+    const item = document.createElement('div');
+    item.className = 'custom-term-alias-row';
+    const description = document.createElement('div');
+    description.className = 'custom-term-alias-description';
+    const title = document.createElement('strong');
+    title.textContent = row.alias || '(空 alias)';
+    const canonical = document.createElement('span');
+    canonical.textContent = `${row.canonical || ''} · ${completeCustomAlias(row).cn || '暂无简中'} / ${completeCustomAlias(row).tw || '暂无繁中'}`;
+    description.append(title, canonical);
+    const actions = document.createElement('div');
+    actions.className = 'custom-term-alias-actions';
+    const view = document.createElement('button');
+    view.type = 'button';
+    view.className = 'btn tiny';
+    view.textContent = '查看';
+    view.addEventListener('click', () => openCustomTermView(completeCustomAlias(row)));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn tiny danger';
+    remove.textContent = '删除';
+    remove.addEventListener('click', () => {
+      const next = customAliasRows();
+      next.splice(index, 1);
+      $('customTermAliases').value = JSON.stringify(next, null, 2);
+      $('customTermAliases').dispatchEvent(new Event('input', { bubbles: true }));
+      renderCustomTermAliases();
+    });
+    actions.append(view, remove);
+    item.append(description, actions);
+    list.append(item);
+  }
+}
+
+function searchCanonicalTerms() {
+  const query = $('customTermModalSearch').value.trim().toLocaleLowerCase();
+  const results = $('customTermModalResults');
+  const state = $('customTermModalState');
+  results.replaceChildren();
+  if (!query) {
+    state.textContent = '请输入简体中文搜索词。';
+    return;
+  }
+  const matches = canonicalGlossaryTerms
+    .filter(term => (term.cn || '').toLocaleLowerCase().includes(query))
+    .sort((a, b) => Number((b.cn || '').toLocaleLowerCase().startsWith(query)) - Number((a.cn || '').toLocaleLowerCase().startsWith(query)) || a.en.localeCompare(b.en))
+    .slice(0, 30);
+  if (!matches.length) {
+    state.textContent = '没有找到对应的官方术语简中译名。';
+    return;
+  }
+  state.textContent = `搜索到 ${matches.length === 30 ? '30 条以上' : `${matches.length} 条`}，选择对应标准术语：`;
+  for (const term of matches) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'term-search-result';
+    button.setAttribute('role', 'option');
+    const cn = document.createElement('strong');
+    cn.textContent = term.cn || term.en;
+    const en = document.createElement('span');
+    en.textContent = term.en;
+    const category = document.createElement('small');
+    category.textContent = `${term.tw || ''}${term.category ? ` · ${term.category}` : ''}`;
+    button.append(cn, en, category);
+    button.addEventListener('click', () => {
+      const alias = $('customTermModalAlias').value.trim();
+      if (!alias) {
+        state.textContent = '请先填写 alias，再选择标准术语。';
+        $('customTermModalAlias').focus();
+        return;
+      }
+      selectedCustomCanonical = { canonical: term.en, alias, cn: term.cn || '', tw: term.tw || '' };
+      $('customTermModalJson').textContent = JSON.stringify(selectedCustomCanonical, null, 2);
+      $('customTermModalJson').hidden = false;
+      $('btn-custom-term-save').disabled = false;
+      state.textContent = `已选择：${term.en}`;
+    });
+    results.append(button);
+  }
+}
+
+function openCustomTermAdd() {
+  customTermDialogMode = 'add';
+  selectedCustomCanonical = null;
+  $('custom-term-dialog-title').textContent = '添加自定义术语';
+  $('custom-term-dialog-desc').textContent = '填写作者的非标准写法，再搜索并选择官方术语。';
+  $('custom-term-editor-fields').hidden = false;
+  $('customTermModalAlias').value = '';
+  $('customTermModalSearch').value = '';
+  $('customTermModalResults').replaceChildren();
+  $('customTermModalState').textContent = '输入简体中文后点击搜索。';
+  $('customTermModalJson').textContent = '';
+  $('customTermModalJson').hidden = true;
+  $('btn-custom-term-save').hidden = false;
+  $('btn-custom-term-save').disabled = true;
+  $('custom-term-dialog').showModal();
+  $('customTermModalAlias').focus();
+}
+
+function openCustomTermView(mapping) {
+  customTermDialogMode = 'view';
+  selectedCustomCanonical = mapping;
+  $('custom-term-dialog-title').textContent = '查看自定义术语';
+  $('custom-term-dialog-desc').textContent = '该记录保存的标准术语、别名和简繁译名。';
+  $('custom-term-editor-fields').hidden = true;
+  $('customTermModalJson').textContent = JSON.stringify(mapping, null, 2);
+  $('customTermModalJson').hidden = false;
+  $('btn-custom-term-save').hidden = true;
+  $('custom-term-dialog').showModal();
+}
+
+async function saveCustomTermMapping() {
+  if (customTermDialogMode !== 'add' || !selectedCustomCanonical) return;
+  const button = $('btn-custom-term-save');
+  if (saving) {
+    toast('设置正在保存，请稍后再保存这条映射。', 'bad');
+    return;
+  }
+  const rows = customAliasRows();
+  const key = selectedCustomCanonical.alias.trim().toLocaleLowerCase();
+  const existing = rows.findIndex(row => String(row.alias || '').trim().toLocaleLowerCase() === key);
+  const mapping = { ...selectedCustomCanonical };
+  if (existing >= 0) rows[existing] = mapping;
+  else rows.push(mapping);
+  $('customTermAliases').value = JSON.stringify(rows, null, 2);
+  $('customTermAliases').dispatchEvent(new Event('input', { bubbles: true }));
+  window.clearTimeout(autoSaveTimer);
+  autoSaveTimer = 0;
+  button.disabled = true;
+  button.textContent = '保存中…';
+  const saved = await save({ auto: true });
+  button.textContent = '保存映射';
+  if (!saved) {
+    button.disabled = false;
+    toast('映射尚未保存，请检查设置页的保存状态后重试。', 'bad');
+    return;
+  }
+  $('custom-term-dialog').close();
+  renderCustomTermAliases();
+  toast(`已保存：${mapping.alias} → ${mapping.canonical}`, 'ok');
+}
+
+async function setupCustomTermEditor() {
+  $('customTermAliases').addEventListener('input', renderCustomTermAliases);
+  $('btn-custom-term-add').addEventListener('click', openCustomTermAdd);
+  $('btn-custom-term-search').addEventListener('click', searchCanonicalTerms);
+  $('btn-custom-term-save').addEventListener('click', saveCustomTermMapping);
+  $('btn-custom-term-cancel').addEventListener('click', () => $('custom-term-dialog').close());
+  $('btn-custom-term-close').addEventListener('click', () => $('custom-term-dialog').close());
+  $('customTermModalAlias').addEventListener('input', () => {
+    if (!selectedCustomCanonical) return;
+    selectedCustomCanonical.alias = $('customTermModalAlias').value.trim();
+    $('customTermModalJson').textContent = JSON.stringify(selectedCustomCanonical, null, 2);
+    $('btn-custom-term-save').disabled = !selectedCustomCanonical.alias;
+  });
+  $('customTermModalSearch').addEventListener('input', () => {
+    selectedCustomCanonical = null;
+    $('customTermModalResults').replaceChildren();
+    $('customTermModalJson').hidden = true;
+    $('btn-custom-term-save').disabled = true;
+    $('customTermModalState').textContent = '输入简体中文后点击搜索。';
+  });
+  $('customTermModalSearch').addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); searchCanonicalTerms(); }
+  });
+  renderCustomTermAliases();
+  try {
+    canonicalGlossaryTerms = await optionsRequest({ type: 'glossary-canonical-options' });
+    renderCustomTermAliases();
+  } catch (error) {
+    $('custom-term-dialog-desc').textContent = `官方术语读取失败：${error.message}`;
   }
 }
 
@@ -299,28 +487,34 @@ async function save({ auto = false } = {}) {
   const patch = collectForm();
   try {
     validateJsonFields(patch);
+    sitePermissionOrigins(patch.selectionMatchPatterns);
   } catch (err) {
-    if (auto) setSaveState('未保存：JSON 格式有误', 'bad');
+    if (auto) setSaveState('未保存：设置格式有误', 'bad');
     else toast(err.message, 'bad');
     return false;
   }
   if (!patch.userPrompt) patch.userPrompt = DEFAULTS.userPrompt;
 
   const snapshot = JSON.stringify(patch);
-  // 自定义中转域名：必须在这一步（用户手势中）申请权限，自动保存时跳过
+  // 站点匹配规则和自定义中转域名：在用户手势中统一申请权限，自动保存时跳过
+  let sitePermissionGranted = false;
+  const siteOrigins = sitePermissionOrigins(patch.selectionMatchPatterns);
   if (!auto) {
+    const requestedOrigins = [...siteOrigins];
     const origin = endpointOrigin(patch.baseUrl);
     const isOfficial = origin === 'https://api.deepseek.com/*';
-    if (origin && !isOfficial) {
+    if (origin && !isOfficial) requestedOrigins.push(origin);
+    if (requestedOrigins.length) {
       try {
-        await chrome.permissions.request({ origins: [origin] });
+        await chrome.permissions.request({ origins: [...new Set(requestedOrigins)] });
       } catch {
-        /* 用户拒绝或不允许时忽略，翻译时会再提示 */
+        /* 站点权限状态会在保存后提示；接口权限会在翻译时提示 */
       }
     }
   }
+  sitePermissionGranted = !siteOrigins.length || await chrome.permissions.contains({ origins: siteOrigins });
   if (snapshot === lastSavedSnapshot) {
-    setSaveState('已保存');
+    setSaveState(sitePermissionGranted ? '已保存' : '已保存；网站权限未全部授予，部分规则暂未生效', sitePermissionGranted ? '' : 'bad');
     checkPermission(patch.baseUrl);
     return true;
   }
@@ -334,8 +528,8 @@ async function save({ auto = false } = {}) {
     renderKeyState(patch.apiKey);
     checkPermission(patch.baseUrl);
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-    setSaveState(`已保存 ${time}`, 'ok');
-    if (!auto) toast('设置已保存', 'ok');
+    setSaveState(sitePermissionGranted ? `已保存 ${time}` : '已保存；网站权限未全部授予，部分规则暂未生效', sitePermissionGranted ? 'ok' : 'bad');
+    if (!auto) toast(sitePermissionGranted ? '设置已保存' : '设置已保存，但部分网站权限未授予，相应规则暂未生效', sitePermissionGranted ? 'ok' : 'bad');
     return true;
   } catch (err) {
     setSaveState('保存失败', 'bad');
@@ -394,12 +588,9 @@ async function testConnection() {
     const res = await chrome.runtime.sendMessage({ type: 'test-connection', patch });
     if (!res?.ok) throw new Error(res?.error || '未知错误');
     const { data } = res;
-    toast(`连接成功 · ${data.model} · ${data.elapsedMs}ms`);
+    const result = `测试连接成功 · ${data.model} · ${data.elapsedMs}ms\n\n${data.sample || '接口已返回有效响应。'}`;
+    toast(result, 'ok', Math.min(12000, Math.max(5000, 3000 + result.length * 70)));
     console.info('[DeepSeek 测试连接]', data);
-    if (data.sample) {
-      $('preview').hidden = false;
-      $('preview').textContent = `【测试连接结果】\n${data.sample}`;
-    }
   } catch (err) {
     toast(`连接失败：${err.message || err}`, 'bad');
   } finally {
@@ -432,18 +623,11 @@ async function preview() {
   };
 
   // 术语表命中的条目会真的写进提示词，所以预览也现场抽一次
-  if (s.glossaryEnabled !== false) {
-    try {
-      const res = await chrome.runtime.sendMessage({
-        type: 'glossary-test',
-        text: PREVIEW_SAMPLE,
-        categories: s.glossaryCategories,
-        maxTerms: s.glossaryMaxTerms,
-      });
-      if (res?.ok) input.terms = res.data.terms || [];
-    } catch {
-      /* 抽不到就按没有术语预览 */
-    }
+  try {
+    const res = await chrome.runtime.sendMessage({ type: 'glossary-test', text: PREVIEW_SAMPLE });
+    if (res?.ok) input.terms = res.data.terms || [];
+  } catch {
+    /* 抽不到就按没有术语预览 */
   }
 
   let endpoint = '';
@@ -474,31 +658,52 @@ async function preview() {
     `\n\n// 示例原文：${PREVIEW_SAMPLE}` +
     `\n// 形态：${s.apiMode === 'chat' ? 'Chat Completions' : 'Responses API'}` +
     `\n// 思考模式：${s.thinkingMode}` +
-    `\n// 本地术语表命中：${input.terms.length} 条（最多 ${s.glossaryMaxTerms}）` +
+    `\n// 本地术语表命中：${input.terms.length} 条` +
     `\n// Tavily 补充：${s.tavilyEnabled ? `开启（${s.tavilyDomains}，max ${s.tavilyMaxResults}）——检索结果会在运行时追加` : '关闭'}`;
 }
 
 /* ------------------------------------------------- 术语表 / Tavily 操作 */
 
-function readFileText(file) {
+function readFileText(file, onProgress = () => {}) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
     reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onprogress = event => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
     reader.readAsText(file, 'utf-8');
   });
 }
 
+function updateGlossaryImportProgress(status, percent) {
+  $('glossary-import-status').textContent = status;
+  $('glossary-import-percent').textContent = `${percent}%`;
+  $('glossary-import-bar').value = percent;
+}
+
 async function importGlossaryFile(file) {
-  const text = await readFileText(file);
-  const rows = parseGlossaryText(text);
+  const isCsv = file.name.toLowerCase().endsWith('.csv');
+  updateGlossaryImportProgress('读取文件…', 0);
+  const text = await readFileText(file, fraction => updateGlossaryImportProgress('读取文件…', Math.round(fraction * 20)));
+  let rows;
+  if (isCsv) {
+    updateGlossaryImportProgress('解析 CSV…', 20);
+    rows = await parseGlossaryCsv(text, percent => updateGlossaryImportProgress('解析 CSV…', 20 + Math.round(percent * 0.6)));
+  } else {
+    updateGlossaryImportProgress('解析术语表…', 80);
+    rows = parseGlossaryText(text);
+  }
   if (!rows.length) throw new Error('没有解析到任何术语');
+  updateGlossaryImportProgress('转换术语数据…', 85);
   const compact = compactRows(rows);
   if (!compact.entries.length) throw new Error('术语条目都缺少 en/zh_cn/zh_tw 字段');
   compact.meta.importedAt = new Date().toISOString();
   compact.meta.fileName = file.name;
+  updateGlossaryImportProgress('保存到浏览器本地…', 92);
   await optionsRequest({ type: 'import-glossary', glossary: compact });
   await renderTermState();
+  updateGlossaryImportProgress(`完成：${compact.entries.length.toLocaleString('zh-CN')} 条`, 100);
   return compact;
 }
 
@@ -513,16 +718,14 @@ async function runGlossaryTest() {
     const res = await chrome.runtime.sendMessage({
       type: 'glossary-test',
       text,
-      categories: s.glossaryCategories,
-      maxTerms: s.glossaryMaxTerms,
     });
     if (!res?.ok) throw new Error(res?.error || '未知错误');
-    const { terms, source, size } = res.data;
+    const { terms, source, size, aliasCount = 0 } = res.data;
     const lines = terms.map(
       (t, i) => `${i + 1}. ${t.en} → ${t.zh_cn}${t.zh_tw && t.zh_tw !== t.zh_cn ? ` / ${t.zh_tw}` : ''}（${t.category}）${t.source ? `\n   ${t.source}` : ''}`
     );
     box.textContent =
-      `原文：${text}\n来源：${source === 'imported' ? '已导入的自定义术语表' : '内置术语表'}（${size} 条）\n` +
+      `原文：${text}\n来源：${source === 'imported' ? '已导入的官方术语表' : '内置术语表'}（${size} 条），自定义别名 ${aliasCount} 条\n` +
       `命中 ${terms.length} 条：\n${lines.join('\n') || '（无）'}`;
   } catch (err) {
     box.textContent = `抽取失败：${err.message || err}`;
@@ -599,15 +802,23 @@ async function runPoe2dbTest() {
 
 /* -------------------------------------------------------------- 其他 */
 
-function toast(message, kind = '') {
+function toast(message, kind = '', durationOverride = null) {
   const el = $('toast');
-  el.textContent = message;
+  $('toast-message').textContent = message;
+  el.querySelector('.toast-icon').textContent = kind === 'bad' ? '!' : '✓';
+  const duration = durationOverride ?? (kind === 'bad' ? 6000 : 2600);
+  el.style.setProperty('--toast-duration', `${duration}ms`);
+  el.setAttribute('role', kind === 'bad' ? 'alert' : 'status');
+  el.setAttribute('aria-live', kind === 'bad' ? 'assertive' : 'polite');
   el.className = `toast ${kind}`.trim();
   el.hidden = false;
   window.clearTimeout(saveTimer);
+  void el.offsetWidth;
+  el.classList.add('is-visible');
   saveTimer = window.setTimeout(() => {
-    el.hidden = true;
-  }, kind === 'bad' ? 6000 : 2600);
+    el.classList.remove('is-visible');
+    saveTimer = window.setTimeout(() => { el.hidden = true; }, 350);
+  }, duration);
 }
 
 function insertAtCursor(textarea, text) {
@@ -650,10 +861,105 @@ function setupStickyHeader() {
 
 /* -------------------------------------------------------------- 启动 */
 
+function setupSettingsTabs() {
+  const tabs = [...document.querySelectorAll('[data-settings-tab]')];
+  const panels = [...document.querySelectorAll('[data-settings-panel]')];
+  if (!tabs.length || !panels.length) return;
+
+  const activate = (index, focus = false) => {
+    const active = tabs[index];
+    if (!active) return;
+    const key = active.dataset.settingsTab;
+    tabs.forEach((tab, i) => {
+      const selected = i === index;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    panels.forEach(panel => { panel.hidden = panel.dataset.settingsPanel !== key; });
+    if (focus) active.focus();
+  };
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activate(index));
+    tab.addEventListener('keydown', event => {
+      let next = index;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      activate(next, true);
+    });
+  });
+
+  const selectedIndex = Math.max(0, tabs.findIndex(tab => tab.getAttribute('aria-selected') === 'true'));
+  activate(selectedIndex);
+}
+
+function setupTargetLanguageControl() {
+  const control = $('targetLangControl');
+  const trigger = $('targetLangTrigger');
+  const menu = $('targetLangOptions');
+  const close = (focusTrigger = false) => {
+    control.classList.remove('is-open');
+    trigger.setAttribute('aria-expanded', 'false');
+    menu.setAttribute('aria-hidden', 'true');
+    if (focusTrigger) trigger.focus();
+  };
+  const open = () => {
+    if (trigger.disabled) return;
+    control.classList.add('is-open');
+    trigger.setAttribute('aria-expanded', 'true');
+    menu.setAttribute('aria-hidden', 'false');
+  };
+
+  trigger.addEventListener('click', () => {
+    if (control.classList.contains('is-open')) close();
+    else open();
+  });
+  trigger.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowDown' || trigger.disabled) return;
+    event.preventDefault();
+    open();
+    const selected = menu.querySelector('[aria-selected="true"]') || menu.querySelector('[data-target-lang]');
+    selected?.focus();
+  });
+  menu.addEventListener('click', event => {
+    const option = event.target.closest('[data-target-lang]');
+    if (!option) return;
+    const value = $('targetLang');
+    value.value = option.dataset.targetLang;
+    syncTargetLanguageControl();
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    close(true);
+  });
+  menu.addEventListener('keydown', event => {
+    const options = [...menu.querySelectorAll('[data-target-lang]')];
+    const index = options.indexOf(document.activeElement);
+    let next = index;
+    if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
+    if (event.key === 'ArrowDown') next = (index + 1) % options.length;
+    else if (event.key === 'ArrowUp') next = (index - 1 + options.length) % options.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = options.length - 1;
+    else return;
+    event.preventDefault();
+    options[next]?.focus();
+  });
+  document.addEventListener('click', event => {
+    if (!control.contains(event.target)) close();
+  });
+}
+
 async function init() {
+  setupSettingsTabs();
   buildChips();
   setupStickyHeader();
   fillForm(await getSettings());
+  setupTargetLanguageControl();
+  $('dualOutput').addEventListener('change', syncTargetLanguageControl);
   await refreshGuideCache();
   initDebugPanel();
 
@@ -667,7 +973,12 @@ async function init() {
   const form = document.querySelector('.wrap');
   form.addEventListener('input', scheduleAutoSave);
   form.addEventListener('change', scheduleAutoSave);
+  $('btn-enable-advanced').addEventListener('click', () => {
+    setAdvancedSettingsEnabled($('btn-enable-advanced').getAttribute('aria-pressed') !== 'true');
+    scheduleAutoSave();
+  });
   window.addEventListener('beforeunload', flushAutoSave);
+  await setupCustomTermEditor();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushAutoSave();
   });
@@ -701,7 +1012,7 @@ async function init() {
     } catch (error) { toast(`导出失败：${error.message || error}`, 'bad'); }
     finally { button.disabled = false; }
   });
-  $('btn-translations-csv-export').addEventListener('click', async () => {
+  $('btn-translations-csv-export')?.addEventListener('click', async () => {
     const button = $('btn-translations-csv-export');
     button.disabled = true;
     try {
@@ -794,12 +1105,6 @@ async function init() {
   // 改地址后实时刷新授权提示
   $('baseUrl').addEventListener('blur', () => checkPermission($('baseUrl').value.trim()));
 
-  // 费用估算：切换计费模型 / 改单价后即时刷新生效单价
-  for (const id of ['costModel', 'costAutoPeak', 'priceCacheHit', 'priceCacheMiss', 'priceOutput', 'model']) {
-    $(id).addEventListener('change', renderCostState);
-    $(id).addEventListener('input', renderCostState);
-  }
-
   // API 形态 / 地址 / 模型：联动端点提示与告警
   for (const id of ['apiMode', 'baseUrl', 'model']) {
     $(id).addEventListener('change', renderApiModeState);
@@ -812,19 +1117,20 @@ async function init() {
   $('glossary-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const importButton = $('btn-glossary-import');
+    const progress = $('glossary-import-progress');
+    progress.hidden = false;
+    importButton.disabled = true;
     try {
       const compact = await importGlossaryFile(file);
       toast(`已导入 ${compact.entries.length} 条术语（${file.name}）`, 'ok');
     } catch (err) {
+      $('glossary-import-status').textContent = `导入失败：${err.message || err}`;
       toast(`导入失败：${err.message || err}`, 'bad');
     } finally {
+      importButton.disabled = false;
       event.target.value = '';
     }
-  });
-  $('btn-glossary-reset').addEventListener('click', async () => {
-    await optionsRequest({ type: 'clear-glossary-override' });
-    await renderTermState();
-    toast('已恢复内置术语表', 'ok');
   });
   $('btn-tavily-test').addEventListener('click', runTavilyTest);
   $('btn-poe2db-test').addEventListener('click', runPoe2dbTest);
@@ -844,7 +1150,7 @@ async function init() {
     input.type = show ? 'text' : 'password';
     $('btn-toggle-tavily').textContent = show ? '隐藏' : '显示';
   });
-  for (const id of ['tavilyApiKey', 'tavilyEnabled', 'glossaryMaxTerms', 'glossaryCategories', 'poe2dbDirectEnabled']) {
+  for (const id of ['tavilyApiKey', 'tavilyEnabled', 'poe2dbDirectEnabled']) {
     $(id).addEventListener('change', renderTermState);
   }
 

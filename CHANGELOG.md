@@ -2,6 +2,166 @@
 
 ## Unreleased
 
+## 1.9.33
+
+- Restore the original responsive build header artwork sizes.
+
+## 1.9.32
+
+- Remove the Overview At a Glance panel and move the update date and video guide link into the build header metadata.
+
+## 1.9.31
+
+- Reduce the build header artwork to 70px on desktop and scale it down at narrower breakpoints.
+
+## 1.9.30
+
+- Keep localized class and ascendancy names in the build header, displayed inline beside their source names.
+
+## 1.9.29
+
+- Compact the build header by removing the right-side section excerpt and showing the title translation inline.
+- Keep class, patch, build type, and author metadata in source form to reduce header height.
+
+## 1.9.28
+
+- Show localized Overview section titles inline beside their source titles.
+
+## 1.9.27
+
+- Reduce Simplified and Traditional Chinese translation text to a consistently secondary size beside source text.
+
+## 1.9.26
+
+- Add a distinct header surface and separator to Overview accordion panels.
+
+## 1.9.25
+
+- Use the panel icon for Overview accordions, position it before the title, and rotate it to indicate vertical expansion.
+
+## 1.9.24
+
+- Stack Overview cards in one column and make guide sections and At a Glance collapsible accordion panels.
+
+## 1.9.23
+
+- Keep the Skills tab within the viewport and scroll long skill lists, gem priorities, and notes independently.
+
+## 1.9.22
+
+- Remove skill tags from active-skill rows because the tooltip already shows them.
+
+## 1.9.21
+
+- Place skill notes beside the skill columns, letting notes fill the remaining width while keeping the skill list about 300px wide.
+
+## 1.9.20
+
+- Show active skills in a single column and open bilingual skill details in a closable tooltip.
+
+## 1.9.19
+
+- Move Gem Priority into a collapsible left sidebar, matching the Gear Priority layout.
+
+## 1.9.18
+
+- Put quest locations and the em dash on one line, with quest and boss names on a separate wrapping line.
+
+## 1.9.17
+
+- Categorize Quest Rewards with local category controls and keep quest data out of online translation.
+- Stop stale content scripts from continuing extension API work after the extension context is invalidated.
+
+## 1.9.15
+
+- Display progression stages as a horizontal row of bilingual buttons.
+
+## 1.9.14
+
+- Show localized build-variant titles beside the English titles on one line, using smaller text.
+
+## 1.9.13
+
+- Display fixed localized skill-stat labels beside their English names, and keep stat values unchanged.
+- Keep translated skill tags on one line with smaller localized text.
+
+## 1.9.12
+
+- Place translated active-skill names beside their English names in the skill list.
+
+## 1.9.11
+
+- Show translated skill names beside the original names in skill detail cards.
+
+## 1.9.10
+
+- Explicitly require numeric JSON translation IDs to prevent batches from being rejected when the model quotes them as strings.
+
+## 1.9.9
+
+- Recover cached translations written with the previous bundled glossary signature and migrate them to the current cache key.
+
+## 1.9.8
+
+- Show cache-read progress before opening a guide, and provide visible progress feedback while retranslating text blocks.
+
+## 1.9.3
+
+- Move guide translation and cache controls into their own settings tab.
+
+## 1.9.2
+
+- Add settings tabs for terminology and web lookup, cost estimation, and debug logs.
+
+## 1.9.1
+
+- Persist bounded diagnostics for every guide page fetch attempt, with safe response metadata and settings-page copy/export controls.
+
+## 1.9.0
+
+- Match gem detail cards to the compact English layout: show gem-name translations inline, use local fixed labels for gem type, level, and cast time, and keep gem tag translations on one line.
+
+## 1.8.3
+
+- Stop rejecting rich-text translations for changed protected wording; use inline spans when mappable and fall back to full text otherwise.
+
+## 1.8.2
+
+- Allow protected punctuation-only rich-text parts to use natural Chinese punctuation.
+
+## 1.8.1
+
+- Accept a Chinese full stop in place of a protected standalone English period in rich-text translations.
+
+## 1.8.0
+
+- Organize settings sections 1–3 into accessible tabs with mouse and keyboard navigation.
+
+## 1.7.9
+
+- Keep a usable full-text translation when the model changes the inline-part count; show the translated block without rich widget labels when alignment is unavailable.
+
+## 1.7.8
+
+- Add a one-click copy button for the selected Debug batch's full input, output, and log.
+
+## 1.7.7
+
+- Render translated rich-text widget paragraphs with their original icons, links, and clickable entity details by translating aligned text parts.
+- Reuse existing cache entries for other paragraphs; embedded-widget paragraphs receive new cache keys so they can be translated into the richer layout.
+
+## 1.7.6
+
+- Add a highlighted on-demand retranslation toggle beside the language selector; block controls stay hidden until the toggle is enabled.
+
+## 1.7.5
+
+- Add a per-text-block retranslation control that replaces only the selected cached translation and records its API usage.
+
+## 1.7.4
+
+- Update the bundled POE2 terminology data to 4,324 entries and keep its CSV source alongside a repeatable JSON build script.
+
 ## 1.7.3
 
 - Rebuild Simplified Chinese equipment trade links as `/trade2/search/poe2/<league>/<gzip-base64url query>` instead of replacing only the international site's hostname. Convert item names and supplied bases with the bundled/imported Simplified Chinese terminology while preserving rarity, stat IDs, numeric thresholds and other query filters.

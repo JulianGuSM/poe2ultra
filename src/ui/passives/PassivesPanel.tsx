@@ -1,4 +1,6 @@
-import { BilingualText } from '@/ui/translation/BilingualText';
+import { BilingualText, useDisplayLocale } from '@/ui/translation/BilingualText';
+import { uiText } from '@/lib/ui/i18n';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { EntityInfo, Passive, Variant } from '@/lib/build/model';
 import type { TreeKind } from '@/lib/passives/site-tree';
@@ -8,12 +10,15 @@ import { passiveTooltip } from '@/lib/tooltip/tooltip-model';
 import { Icon } from '@/ui/common/Icon';
 import { RichText } from '@/ui/rich-text/RichText';
 import { entityChipRenderer } from '@/ui/tooltip/EntityTooltipChip';
-import { WithTooltip } from '@/ui/tooltip/Tooltip';
+import { TooltipLauncher, WithTooltip } from '@/ui/tooltip/Tooltip';
 
 export type EmbedTree = (options: {
   kind: TreeKind;
   placeholder: HTMLElement;
   variantIndex: number;
+  active?: boolean;
+  passiveCandidates?: Passive[];
+  onPassiveClick?: (passive: Passive, anchor: HTMLElement) => void;
   onStatus: (status: TreeEmbedStatus) => void;
 }) => TreeEmbed;
 
@@ -28,41 +33,55 @@ const statusText = (status: Exclude<TreeEmbedStatus, 'ready'>, kind: TreeKind) =
 export function PassivesPanel({
   variant,
   variantIndex,
+  active = true,
+  sourceVariant = variant,
   entities,
   embedTree = embedIntoPage,
   treeFocus,
 }: {
   variant: Variant;
   variantIndex: number;
+  active?: boolean;
+  sourceVariant?: Variant;
   entities: Record<string, EntityInfo>;
   embedTree?: EmbedTree;
   treeFocus?: TreeFocus;
 }) {
   const { passives, passiveNotes } = variant;
   const focus = useTreeFocus('passive-tree', treeFocus);
+  const locale = useDisplayLocale();
   const renderEntity = useMemo(() => entityChipRenderer(entities), [entities]);
-  // The priority — in which order to take the passives — is what the tab is for, so it opens first.
-  const [side, setSide] = useState<SideView>('keys');
-  const showNotes = side === 'notes' && passiveNotes !== null;
+  const renderTranslatedEntity = useMemo(() => entityChipRenderer(entities, true), [entities]);
+  const [priorityCollapsed, setPriorityCollapsed] = useState(true);
+  const [passiveTooltipRequest, setPassiveTooltipRequest] = useState<{ anchor: HTMLElement; passive: Passive } | null>(null);
+  const passiveCandidates = useMemo(() => [...sourceVariant.passives.keyPassives, ...sourceVariant.passives.ascendancy], [sourceVariant]);
+  const tooltipRequest = useMemo(
+    () => passiveTooltipRequest ? { anchor: passiveTooltipRequest.anchor, model: passiveTooltip(passiveTooltipRequest.passive) } : null,
+    [passiveTooltipRequest],
+  );
+  const priorityTitle = uiText('Passive Priority', locale);
+  const notesTitle = uiText('Notes', locale);
   const points = [`${passives.nodeCount} points`, passives.ascendancyNodeCount > 0 ? `${passives.ascendancyNodeCount} ascendancy` : null].filter(Boolean).join(' · ');
 
   return (
-    <div class="passives">
-      <SiteTree kind="passive-tree" variantIndex={variantIndex} embedTree={embedTree} />
-      <aside class="card passives__side">
-        <div class="passives__heading">
-          {passiveNotes ? (
-            <SideTabs label="Passives side panel" idPrefix="passives-side" keysText="Priority" keysLabel="Passive priority" view={side} onSelect={setSide} />
-          ) : (
-            <h2 class="card__title">Priority</h2>
-          )}
-          {!showNotes && <span class="passives__points">{points}</span>}
-        </div>
-        <div class="passives__lists" {...(passiveNotes ? { role: 'tabpanel', 'aria-labelledby': showNotes ? 'passives-side-notes' : 'passives-side-keys' } : {})}>
-          {showNotes ? (
-            <RichText value={passiveNotes} renderEntity={renderEntity} class="passives__notes" />
-          ) : (
-            <>
+    <div class={`passives${priorityCollapsed ? ' passives--priority-collapsed' : ''}${passiveNotes ? ' passives--has-notes' : ''}`}>
+      <TooltipLauncher request={tooltipRequest} />
+      <aside class={`card passives__priority${priorityCollapsed ? ' passives__priority--collapsed' : ''}`} aria-label={priorityTitle}>
+        {priorityCollapsed ? (
+          <button type="button" class="glance__rail" aria-label={`Expand ${priorityTitle}`} title={`Expand ${priorityTitle}`} aria-expanded="false" onClick={() => setPriorityCollapsed(false)}>
+            <PanelLeftOpen size={16} aria-hidden="true" />
+            <span class="glance__rail-title" aria-hidden="true">{priorityTitle}</span>
+          </button>
+        ) : (
+          <>
+            <div class="glance__header">
+              <h2 class="card__title">{priorityTitle}</h2>
+              <span class="passives__points">{points}</span>
+              <button type="button" class="icon-button glance__toggle" aria-label={`Collapse ${priorityTitle}`} title={`Collapse ${priorityTitle}`} aria-expanded="true" onClick={() => setPriorityCollapsed(true)}>
+                <PanelLeftClose size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div class="passives__lists">
               {passives.ascendancy.length > 0 && (
                 <div class="passives__group">
                   <p class="passives__label">Ascendancy</p>
@@ -77,10 +96,24 @@ export function PassivesPanel({
                   <p class="passives__empty">The author hasn't set an order for the passives of this variant.</p>
                 )}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </aside>
+      <SiteTree
+        kind="passive-tree"
+        variantIndex={variantIndex}
+        active={active}
+        passiveCandidates={passiveCandidates}
+        onPassiveClick={(passive, anchor) => setPassiveTooltipRequest({ passive, anchor })}
+        embedTree={embedTree}
+      />
+      {passiveNotes && (
+        <aside class="card passives__notes-panel" aria-label={notesTitle}>
+          <h2 class="card__title">{notesTitle}</h2>
+          <RichText value={passiveNotes} renderEntity={renderEntity} renderTranslatedEntity={renderTranslatedEntity} class="passives__notes" />
+        </aside>
+      )}
     </div>
   );
 }
@@ -125,15 +158,32 @@ function SideTab({ id, label, selected, onSelect, children }: { id: string; labe
 }
 
 /** Placeholder the site's tree is laid over, with the status until the tree is shown. */
-export function SiteTree({ kind, variantIndex, embedTree }: { kind: TreeKind; variantIndex: number; embedTree: EmbedTree }) {
+export function SiteTree({ kind, variantIndex, active = true, passiveCandidates = [], onPassiveClick, embedTree }: {
+  kind: TreeKind;
+  variantIndex: number;
+  active?: boolean;
+  passiveCandidates?: Passive[];
+  onPassiveClick?: (passive: Passive, anchor: HTMLElement) => void;
+  embedTree: EmbedTree;
+}) {
   const stage = useRef<HTMLDivElement>(null);
   const embed = useRef<TreeEmbed | null>(null);
   const shownIndex = useRef(variantIndex);
+  const onPassiveClickRef = useRef(onPassiveClick);
+  onPassiveClickRef.current = onPassiveClick;
   const [status, setStatus] = useState<TreeEmbedStatus>('loading');
 
   useEffect(() => {
     const placeholder = stage.current!;
-    const handle = embedTree({ kind, placeholder, variantIndex: shownIndex.current, onStatus: setStatus });
+    const handle = embedTree({
+      kind,
+      placeholder,
+      variantIndex: shownIndex.current,
+      active,
+      passiveCandidates,
+      onPassiveClick: (passive, anchor) => onPassiveClickRef.current?.(passive, anchor),
+      onStatus: setStatus,
+    });
     embed.current = handle;
     // The tree is laid over the placeholder with fixed positioning, so it has to follow the panel's scrolling.
     const scroller = placeholder.closest('.build-view__panel');
@@ -145,6 +195,14 @@ export function SiteTree({ kind, variantIndex, embedTree }: { kind: TreeKind; va
       embed.current = null;
     };
   }, [embedTree, kind]);
+
+  useEffect(() => {
+    embed.current?.setActive(active);
+  }, [active]);
+
+  useEffect(() => {
+    embed.current?.setPassiveCandidates(passiveCandidates);
+  }, [passiveCandidates]);
 
   // Another variant switches the tree the site already shows.
   useEffect(() => {

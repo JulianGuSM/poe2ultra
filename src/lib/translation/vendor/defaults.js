@@ -12,12 +12,9 @@ export const DEFAULTS = {
   timeoutMs: 90000,
 
   // —— 本地术语表 ——
-  // 从 data/glossary.json（由 tools/build-glossary.mjs 打包）里检索命中术语，
+  // 从 data/poe2_terms.json（由 data/poe2_terms.csv 生成）里检索命中术语，
   // 作为上下文交给模型；设置页也可以导入更新过的术语表覆盖内置数据。
   glossaryEnabled: true,
-  glossaryMaxTerms: 20,
-  glossaryCategories: '', // 逗号分隔，留空＝全部（如 GemEffects,keyword）
-  glossaryStrict: true, // 命中术语时在系统提示词里追加「必须采用表内译名」
 
   // —— poe2db 直查（按术语直接构造页面 URL，不依赖搜索）——
   // 术语表没收录的候选词，按 slug 规则构造 https://poe2db.tw/{us|cn|tw}/<术语> 直接抓，
@@ -37,7 +34,7 @@ export const DEFAULTS = {
   // Tavily 按请求计费，同一次请求里多要几条不多花钱。
   tavilyMaxResults: 6,
   tavilyDomains: 'poe2db.tw',
-  showContext: true, // 面板里展示命中的术语与检索来源
+  showContext: false, // 默认不在面板里展示命中的术语与检索来源
 
   // —— 思考模式 ——
   // default = 不发送思考参数，由服务端决定（官方当前默认为开启 / effort=high）

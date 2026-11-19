@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildIndex } from '@/lib/translation/vendor/glossary.js';
 import { chinaTradeUrl, DEFAULT_CHINA_LEAGUE } from './china';
 
-const names = buildIndex(JSON.parse(readFileSync('public/data/glossary.json', 'utf8'))).en;
+const names = buildIndex(JSON.parse(readFileSync('public/data/poe2_terms.json', 'utf8'))).en;
 const original = 'https://www.pathofexile.com/trade2/search/poe2/Forbidden%20Rites/H4sIAAAAAAAAClWOQQpCMRBDryJZ9wTdewG38pFRxzLwnV-nU-FTenepbmpWCXmBNBQnrwWxYcsumyKi8K0aXVdGD1B6MiKOb7ZkVLJoOpxEE8J3WhDPDb7nAZHeEfCQ1dlGsfRlij_sMuXJGpn4_nejqrwqow99AAQKnVCoAAAA';
 const confirmed = 'H4sIAAAAAAAACqtWKi5JLCktVrKqVsovKMnMz1OyUipOTS4tSkzKSVWq1VHKS8xNVbJSerZhx7PGSc-3LH--Z-WTnd3POiYp6SiVVBaA5J73L3je1_msY9KznnYlHbCJxUpW0dUw-cS8FCUdpbTMnJLUIpBEbG0sEheiLB6Jj8QsSizKLKlEcV1pXmZhaapSLQgAAMpLQD2_AAAA';
 const decode = (encoded: string) => JSON.parse(gunzipSync(Buffer.from(encoded, 'base64url')).toString('utf8'));

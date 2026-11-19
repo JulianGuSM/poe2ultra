@@ -10,21 +10,35 @@ import { createBuildLoader } from '@/lib/page/build-loader';
 import { createHtmlFetcher } from '@/lib/page/fetch-html';
 import { pageFetch } from '@/lib/page/page-fetch';
 import { createPageController, isOverlayVisible } from '@/lib/page/controller';
-import { glanceCollapsedItem, headerCollapsedItem, lastTabsItem, lastVariantsItem, pageModeItem, rememberPerBuild } from '@/lib/page/preferences';
+import { headerCollapsedItem, lastTabsItem, lastVariantsItem, pageModeItem, rememberPerBuild } from '@/lib/page/preferences';
 import { guardFocus } from '@/lib/page/focus-guard';
 import { setPageLocked } from '@/lib/page/page-lock';
 import { mountApp } from '@/ui/app/mount';
+import { browser } from 'wxt/browser';
 
 const MARKER_ATTRIBUTE = 'data-poe2-build-guide';
 
 // Build pages are asked for as the page itself: in Firefox a content script's own fetch goes as the extension.
-const fetchHtml = createHtmlFetcher(pageFetch());
+const fetchHtml = createHtmlFetcher(pageFetch(), {
+  onAttempt: (attempt, request) => browser.runtime.sendMessage({
+    type: 'page-fetch-diagnostics', action: 'append', sessionId: request.sessionId, url: request.url, attempt,
+  }),
+});
 
 export default defineContentScript({
   // The whole site: build pages are often reached by in-app navigation, which doesn't inject scripts.
   matches: ['https://mobalytics.gg/*', 'https://www.mobalytics.gg/*'],
   runAt: 'document_idle',
   async main(ctx) {
+    let invalidated = false;
+    ctx.onInvalidated(() => {
+      invalidated = true;
+      setPageLocked(document, false);
+      document.documentElement.removeAttribute(MARKER_ATTRIBUTE);
+    });
+
+    const initialMode = await readPreference(pageModeItem, 'extension');
+    if (invalidated) return;
     const load = createBuildLoader({
       initialUrl: location.href,
       initialDocument: document,
@@ -33,8 +47,8 @@ export default defineContentScript({
     });
     const controller = createPageController({
       load,
-      initialMode: await pageModeItem.getValue(),
-      onModeChange: (mode) => void pageModeItem.setValue(mode),
+      initialMode,
+      onModeChange: (mode) => { if (!invalidated) writePreference(pageModeItem, mode); },
     });
 
     controller.subscribe((state) => {
@@ -42,40 +56,44 @@ export default defineContentScript({
       if (state.active) document.documentElement.setAttribute(MARKER_ATTRIBUTE, 'active');
       else document.documentElement.removeAttribute(MARKER_ATTRIBUTE);
     });
-    ctx.onInvalidated(() => {
-      setPageLocked(document, false);
-      document.documentElement.removeAttribute(MARKER_ATTRIBUTE);
-    });
-
     let mounting: Promise<void> | null = null;
     const handleUrl = async (url: string) => {
+      if (invalidated) return;
       if (isBuildPageUrl(url)) {
         mounting ??= Promise.all([
-          headerCollapsedItem.getValue(),
-          lastTabsItem.getValue(),
-          glanceCollapsedItem.getValue(),
-          lastVariantsItem.getValue(),
-        ]).then(([headerCollapsed, lastTabs, glanceCollapsed, lastVariants]) =>
-          mountApp(ctx, controller, {
+          readPreference(headerCollapsedItem, false),
+          readPreference(lastTabsItem, {}),
+          readPreference(lastVariantsItem, {}),
+        ]).then(([headerCollapsed, lastTabs, lastVariants]) =>
+          invalidated ? undefined : mountApp(ctx, controller, {
             headerCollapsed,
-            onHeaderCollapsedChange: (collapsed) => void headerCollapsedItem.setValue(collapsed),
+            onHeaderCollapsedChange: (collapsed) => { if (!invalidated) writePreference(headerCollapsedItem, collapsed); },
             lastTabs,
-            onLastTabChange: (buildSlug, tab) =>
-              void lastTabsItem.getValue().then((remembered) => lastTabsItem.setValue(rememberPerBuild(remembered, buildSlug, tab))),
-            glanceCollapsed,
-            onGlanceCollapsedChange: (collapsed) => void glanceCollapsedItem.setValue(collapsed),
+            onLastTabChange: (buildSlug, tab) => {
+              if (invalidated) return;
+              void readPreference(lastTabsItem, {}).then((remembered) => {
+                if (!invalidated) writePreference(lastTabsItem, rememberPerBuild(remembered, buildSlug, tab));
+              });
+            },
             lastVariants,
-            onVariantChange: (buildSlug, variant) =>
-              void lastVariantsItem.getValue().then((remembered) => lastVariantsItem.setValue(rememberPerBuild(remembered, buildSlug, variant))),
+            onVariantChange: (buildSlug, variant) => {
+              if (invalidated) return;
+              void readPreference(lastVariantsItem, {}).then((remembered) => {
+                if (!invalidated) writePreference(lastVariantsItem, rememberPerBuild(remembered, buildSlug, variant));
+              });
+            },
           }).then((host) => {
-            ctx.onInvalidated(guardFocus({ doc: document, host, isActive: () => isOverlayVisible(controller.getState()) }));
+            if (!invalidated && host) ctx.onInvalidated(guardFocus({ doc: document, host, isActive: () => isOverlayVisible(controller.getState()) }));
           }),
-        );
+        ).catch((error: unknown) => {
+          if (!invalidated) console.warn('[poe2ultra] Could not mount build guide UI:', error);
+        });
         await mounting;
       }
+      if (invalidated) return;
       controller.handleUrl(url);
     };
-    ctx.addEventListener(window, 'wxt:locationchange', (event) => void handleUrl(event.newUrl.href));
+    ctx.addEventListener(window, 'wxt:locationchange', (event) => { if (!invalidated) void handleUrl(event.newUrl.href); });
     await handleUrl(location.href);
 
     if (import.meta.env.DEV) {
@@ -104,3 +122,19 @@ export default defineContentScript({
     }
   },
 });
+
+async function readPreference<T>(item: { getValue: () => Promise<T> }, fallback: T): Promise<T> {
+  try {
+    return await item.getValue();
+  } catch {
+    return fallback;
+  }
+}
+
+function writePreference<T>(item: { setValue: (value: T) => Promise<unknown> }, value: T): void {
+  try {
+    void item.setValue(value).catch(() => {});
+  } catch {
+    // Extension contexts can be invalidated between a UI event and its storage write.
+  }
+}

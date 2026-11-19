@@ -15,7 +15,7 @@ const variant = (title: string) => BUILD.variants.find((v) => v.title === title)
 
 function fakeEmbed() {
   const calls: Parameters<EmbedTree>[0][] = [];
-  const handle = { setVariant: vi.fn(), sync: vi.fn(), destroy: vi.fn() };
+  const handle = { setVariant: vi.fn(), setActive: vi.fn(), setPassiveCandidates: vi.fn(), sync: vi.fn(), destroy: vi.fn() };
   const embedTree: EmbedTree = (options) => {
     calls.push(options);
     return handle;

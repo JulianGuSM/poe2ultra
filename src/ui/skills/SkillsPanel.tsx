@@ -1,6 +1,7 @@
 import { BilingualText, useDisplayLocale } from '@/ui/translation/BilingualText';
 import { uiRequirements, uiText } from '@/lib/ui/i18n';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-preact';
+import { useMemo, useRef, useState } from 'preact/hooks';
 import type { Attributes, EntityInfo, Gem, GemPriorityEntry, Skill, Variant } from '@/lib/build/model';
 import { gemAttribute, gemTooltip } from '@/lib/tooltip/tooltip-model';
 import { copyText } from '@/lib/ui/clipboard';
@@ -8,6 +9,7 @@ import { Icon } from '@/ui/common/Icon';
 import { RichText } from '@/ui/rich-text/RichText';
 import { entityChipRenderer } from '@/ui/tooltip/EntityTooltipChip';
 import { WithTooltip } from '@/ui/tooltip/Tooltip';
+import { useToast } from '@/ui/common/Toast';
 
 const EMPTY = "The author hasn't listed skills for this variant.";
 
@@ -24,8 +26,10 @@ export function SkillsPanel({
 }) {
   const locale = useDisplayLocale();
   const renderEntity = useMemo(() => entityChipRenderer(entities), [entities]);
-  const { notice, copyName } = useCopyName(copy);
+  const renderTranslatedEntity = useMemo(() => entityChipRenderer(entities, true), [entities]);
+  const { copyName } = useCopyName(copy);
   const [selected, setSelected] = useState(0);
+  const [priorityCollapsed, setPriorityCollapsed] = useState(true);
   // Which gem the gem priority points at, so Active Skills can mark it.
   const [pointedAt, setPointedAt] = useState<GemPointer | null>(null);
   const skill = variant.skills[selected] ?? variant.skills[0];
@@ -38,6 +42,16 @@ export function SkillsPanel({
     <div class="skills">
       {skill ? (
         <div class="skills__columns">
+          {variant.gemPriority.length > 0 && (
+            <GemPriorityCard
+              entries={variant.gemPriority}
+              currentSkillSlug={skill.gem.slug}
+              onPointAt={setPointedAt}
+              onCopy={copyName}
+              collapsed={priorityCollapsed}
+              onToggle={() => setPriorityCollapsed((value) => !value)}
+            />
+          )}
           <div class="skills__main">
             <section class="card skills__list">
               <div class="skills__heading">
@@ -57,24 +71,15 @@ export function SkillsPanel({
                 ))}
               </ul>
             </section>
-            {variant.gemPriority.length > 0 && (
-              <GemPriorityCard entries={variant.gemPriority} currentSkillSlug={skill.gem.slug} onPointAt={setPointedAt} onCopy={copyName} />
-            )}
           </div>
-          <SkillDetails skill={skill} onCopy={copyName} />
         </div>
       ) : (
         <p class="panel-empty">{EMPTY}</p>
       )}
-      {notice && (
-        <p class="skills__copied" role="status">
-          {notice}
-        </p>
-      )}
       {variant.skillNotes && (
         <section class="card skills__notes">
           <h2 class="card__title">{uiText("Author's Notes", locale)}</h2>
-          <RichText value={variant.skillNotes} renderEntity={renderEntity} />
+          <RichText value={variant.skillNotes} renderEntity={renderEntity} renderTranslatedEntity={renderTranslatedEntity} />
         </section>
       )}
     </div>
@@ -83,19 +88,14 @@ export function SkillsPanel({
 
 /** Copies a gem name and says so for a moment, so the click has a visible answer. */
 function useCopyName(copy: (text: string) => Promise<boolean>) {
-  const [notice, setNotice] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const toast = useToast();
 
   const copyName = async (name: string) => {
     const copied = await copy(name);
-    setNotice(copied ? `Copied \u201c${name}\u201d` : "Couldn't copy the name");
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setNotice(null), 2000);
+    toast.notify(copied ? `Copied \u201c${name}\u201d` : "Couldn't copy the name", copied ? 'success' : 'error');
   };
 
-  return { notice, copyName };
+  return { copyName };
 }
 
 const copyLabel = (name: string) => `Copy \u201c${name}\u201d`;
@@ -124,22 +124,23 @@ function SkillRow({
   const matchesSupport = (support: Gem) => pointedAt !== null && pointedAt.parentSlug === gem.slug && pointedAt.gemSlug === support.slug;
   return (
     <li class={`skill-row${selected ? ' skill-row--selected' : ''}${matchesSkill ? ' skill-row--match' : ''}`}>
-      <button
-        type="button"
-        class="skill-row__main"
-        aria-pressed={selected}
-        title="Show details and copy the gem name"
-        onClick={() => {
-          onSelect();
-          void onCopy(gem.name);
-        }}
-      >
-        <GemIcon gem={gem} class="skill-row__icon" />
-        <span class="skill-row__text">
-          <span class="skill-row__name"><BilingualText text={gem.name} /></span>
-          {gem.details && gem.details.tags.length > 0 && <span class="skill-row__tags"><BilingualText text={gem.details.tags.join(' · ')} parts={gem.details.tags} /></span>}
-        </span>
-      </button>
+      <WithTooltip model={gemTooltip(gem)} openOnChildClick>
+        <button
+          type="button"
+          class="skill-row__main"
+          aria-pressed={selected}
+          title="Show skill details and copy the gem name"
+          onClick={() => {
+            onSelect();
+            void onCopy(gem.name);
+          }}
+        >
+          <GemIcon gem={gem} class="skill-row__icon" />
+          <span class="skill-row__text">
+            <span class="skill-row__name"><BilingualText text={gem.name} inline /></span>
+          </span>
+        </button>
+      </WithTooltip>
       {supports.length > 0 && (
         <span class="skill-row__supports">
           {supports.map((support, i) => (
@@ -163,16 +164,36 @@ function GemPriorityCard({
   currentSkillSlug,
   onPointAt,
   onCopy,
+  collapsed,
+  onToggle,
 }: {
   entries: GemPriorityEntry[];
   currentSkillSlug: string;
   onPointAt: (pointer: GemPointer | null) => void;
   onCopy: (name: string) => void;
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
   const locale = useDisplayLocale();
+  const title = uiText('Gem Priority', locale);
+  if (collapsed) {
+    return (
+      <section class="card glance glance--collapsed gem-priority gem-priority--collapsed" aria-label={title}>
+        <button type="button" class="glance__rail" aria-label={`Expand ${title}`} title={`Expand ${title}`} aria-expanded="false" onClick={onToggle}>
+          <PanelLeftOpen size={16} aria-hidden="true" />
+          <span class="glance__rail-title" aria-hidden="true">{title}</span>
+        </button>
+      </section>
+    );
+  }
   return (
     <section class="card gem-priority">
-      <h2 class="card__title">{uiText('Gem Priority', locale)}</h2>
+      <div class="glance__header">
+        <h2 class="card__title">{title}</h2>
+        <button type="button" class="icon-button glance__toggle" aria-label={`Collapse ${title}`} title={`Collapse ${title}`} aria-expanded="true" onClick={onToggle}>
+          <PanelLeftClose size={16} aria-hidden="true" />
+        </button>
+      </div>
       <ol class="gem-priority__list" aria-label="Gem priority">
         {entries.map((entry, i) => (
           <li
@@ -200,80 +221,6 @@ function GemPriorityCard({
           </li>
         ))}
       </ol>
-    </section>
-  );
-}
-
-function SkillDetails({ skill, onCopy }: { skill: Skill; onCopy: (name: string) => void }) {
-  const locale = useDisplayLocale();
-  const { gem, supports } = skill;
-  const details = gem.details;
-  return (
-    <section class="card skill-details" aria-label="Skill details">
-      <div class="skill-details__header">
-        <button type="button" class="gem-copy" aria-label={copyLabel(gem.name)} onClick={() => onCopy(gem.name)}>
-          <GemIcon gem={gem} class="skill-details__icon" />
-        </button>
-        <div>
-          <h2 class="skill-details__name"><BilingualText text={gem.name} /></h2>
-          {details && details.tags.length > 0 && (
-            <ul class="skill-details__tags">
-              {details.tags.map((tag) => (
-                <li key={tag}><BilingualText text={tag} /></li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-      {!details && <p class="panel-empty">No details available for this gem.</p>}
-      {details && details.stats.length > 0 && (
-        <dl class="skill-details__stats">
-          {details.stats.map(({ name, value }) => (
-            <div key={name}>
-              <dt><BilingualText text={name} /></dt>
-              <dd><BilingualText text={value} /></dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {details && details.requirements.length > 0 && (
-        <p class="skill-details__requirements">{uiRequirements(details.requirements.map(({ name, value }) => `${name} ${value}`).join(', '), locale)}</p>
-      )}
-      {details?.description && <p class="skill-details__description"><BilingualText text={details.description} /></p>}
-      {details && details.effects.length > 0 && (
-        <ul class="skill-details__effects">
-          {details.effects.map((line, i) => (
-            <li key={i}><BilingualText text={line} /></li>
-          ))}
-        </ul>
-      )}
-      {details && details.qualityEffects.length > 0 && (
-        <div class="skill-details__quality">
-          <p class="skill-details__section-title">{uiText('Additional Effects From Quality', locale)}</p>
-          <ul>
-            {details.qualityEffects.map((line, i) => (
-              <li key={i}><BilingualText text={line} /></li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {supports.length > 0 && (
-        <div class="skill-details__supports">
-          <p class="skill-details__section-title">{uiText('Support Gems', locale)}</p>
-          <ul>
-            {supports.map((support, i) => (
-              <li key={`${support.slug}-${i}`}>
-                <WithTooltip key={`${support.slug}-${i}`} model={gemTooltip(support)} openOnChildClick>
-                  <button type="button" class="skill-details__support gem-copy" aria-label={copyLabel(support.name)} onClick={() => onCopy(support.name)}>
-                    <GemIcon gem={support} class={`skill-details__support-icon gem-socket gem-socket--${gemAttribute(support) ?? 'none'}`} />
-                    <span class="skill-details__support-name"><BilingualText text={support.name} /></span>
-                  </button>
-                </WithTooltip>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </section>
   );
 }

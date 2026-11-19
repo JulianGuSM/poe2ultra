@@ -1,6 +1,6 @@
 // Exercise the actual production worker with a simulated Chrome API and network.
 // No network requests or user credentials are used. Run after `npm run build`.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import assert from 'node:assert/strict';
 import { indexedDB } from 'fake-indexeddb';
@@ -11,17 +11,19 @@ const manifest = JSON.parse(readFileSync('.output/chrome-mv3/manifest.json', 'ut
 assert.equal(manifest.name, 'poe2ultra');
 assert.equal(manifest.options_ui.open_in_tab, true);
 assert.ok(manifest.background.service_worker);
+assert.ok(!manifest.content_scripts?.some(entry => entry.js?.some(file => file.includes('selection'))), 'Selection translator must not be statically injected into web pages');
+assert.ok(existsSync('.output/chrome-mv3/selection.js'), 'The dynamically registered selection script must be packaged');
 const event = () => ({ listeners: [], addListener(fn) { this.listeners.push(fn); } });
 const local = {};
 const chrome = {
   runtime: { id: 'poe2ultra-test', getURL: path => `chrome-extension://poe2ultra-test/${path.replace(/^\//, '')}`,
-    onMessage: event(), onConnect: event(), onInstalled: event(), openOptionsPage: async () => {} },
+    onMessage: event(), onConnect: event(), onInstalled: event(), onStartup: event(), openOptionsPage: async () => {} },
   action: { onClicked: event() },
-  contextMenus: { onClicked: event(), removeAll: callback => callback(), create: () => {} },
+  contextMenus: { onClicked: event(), removeAll: callback => callback(), remove: (id, callback) => callback?.(), create: () => {} },
   commands: { onCommand: event() },
-  permissions: { contains: async () => true, request: async () => true },
+  permissions: { contains: async () => true, request: async () => true, onAdded: event(), onRemoved: event() },
   tabs: { query: async () => [], sendMessage: async () => {} },
-  scripting: { executeScript: async () => {} },
+  scripting: { executeScript: async () => {}, getRegisteredContentScripts: async () => [], unregisterContentScripts: async () => {}, registerContentScripts: async () => {} },
   storage: { onChanged: event(), local: {
     async get(keys) { return Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, local[key]])); },
     async set(values) { Object.assign(local, values); },
@@ -33,7 +35,7 @@ let lastRequestBody;
 let incompleteResponsesRemaining = 0;
 const debugConsole = [];
 const fetchMock = async (url, init) => {
-  if (url === chrome.runtime.getURL('data/glossary.json')) return new Response(readFileSync('public/data/glossary.json', 'utf8'));
+  if (url === chrome.runtime.getURL('data/poe2_terms.json')) return new Response(readFileSync('public/data/poe2_terms.json', 'utf8'));
   assert.equal(url, 'https://api.deepseek.com/chat/completions');
   assert.equal(init.headers.Authorization, 'Bearer test-placeholder');
   const body = JSON.parse(init.body);
@@ -170,7 +172,7 @@ const combinedCsv = await cacheMessage('export-csv');
 assert.equal(combinedCsv.count, 3);
 assert.ok(combinedCsv.csv.includes('Abyssal Lich grants 25% damage.,深渊巫妖造成25%伤害。,深淵妖巫造成25%傷害。'));
 assert.ok(!combinedCsv.csv.includes('test-placeholder'));
-assert.ok(manifest.content_scripts.some(entry => entry.matches.includes('https://*/*') && entry.js.includes('content-scripts/selection.js')));
+assert.ok(!manifest.content_scripts?.some(entry => entry.js?.includes('selection.js')));
 assert.equal(manifest.commands['translate-selection'].suggested_key.default, 'Alt+Q');
 await settingsMessage({ action: 'save', settings: { ...saved.settings, debugEnabled: true,
   systemPrompt: 'SELECTION ONLY SYSTEM', userPrompt: 'SELECTION ONLY USER {{text}}' } });

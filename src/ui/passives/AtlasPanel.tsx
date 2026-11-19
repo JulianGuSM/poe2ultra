@@ -25,6 +25,7 @@ export function AtlasPanel({
   const { atlas, atlasNotes } = variant;
   const focus = useTreeFocus('atlas-tree', treeFocus);
   const renderEntity = useMemo(() => entityChipRenderer(entities), [entities]);
+  const renderTranslatedEntity = useMemo(() => entityChipRenderer(entities, true), [entities]);
   const [side, setSide] = useState<SideView>('keys');
   const showNotes = side === 'notes' && atlasNotes !== null;
 
@@ -56,7 +57,7 @@ export function AtlasPanel({
           {...(atlasNotes ? { role: 'tabpanel', 'aria-labelledby': showNotes ? 'atlas-side-notes' : 'atlas-side-keys' } : {})}
         >
           {showNotes ? (
-            <RichText value={atlasNotes} renderEntity={renderEntity} class="passives__notes" />
+            <RichText value={atlasNotes} renderEntity={renderEntity} renderTranslatedEntity={renderTranslatedEntity} class="passives__notes" />
           ) : !atlas || atlas.groups.length === 0 ? (
             <p class="passives__empty">
               {atlas ? "The author hasn't taken atlas notables in this variant." : "The author hasn't suggested atlas passives for this variant yet."}

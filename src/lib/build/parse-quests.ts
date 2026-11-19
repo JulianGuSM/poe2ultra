@@ -1,8 +1,9 @@
 import { obj, objs, str } from '@/lib/data/coerce';
-import type { QuestAct } from './model';
+import type { QuestAct, QuestRewardCategory } from './model';
+import type { StaticIndex } from './static-index';
 
 /** `questRewards.quests[]`: each quest with the reward the author picked (null when none). */
-export function parseQuestRewards(raw: unknown): QuestAct[] {
+export function parseQuestRewards(raw: unknown, index?: StaticIndex): QuestAct[] {
   const acts = new Map<string, QuestAct>();
   for (const entry of objs(obj(raw)?.quests)) {
     const quest = obj(entry.quest);
@@ -13,7 +14,9 @@ export function parseQuestRewards(raw: unknown): QuestAct[] {
 
     if (!acts.has(act)) acts.set(act, { act, quests: [] });
     const choices = Array.isArray(quest.rewards) ? quest.rewards.length : 0;
-    acts.get(act)!.quests.push({ name, area: str(quest.area), reward, isChoice: choices > 1 });
+    const categories: QuestRewardCategory[] = index?.questCategories(name, act) ?? [];
+    if (choices > 1 && !categories.includes('choices')) categories.push('choices');
+    acts.get(act)!.quests.push({ name, area: str(quest.area), reward, isChoice: choices > 1, categories });
   }
   return [...acts.values()];
 }

@@ -5,7 +5,8 @@ import { requireEndpointPermission } from '../translation/preferences';
  * Service Worker：唯一持有 API Key 的地方，负责调用 DeepSeek 接口。
  * 与页面之间用长连接 Port 通信，以便把流式结果边收边推。
  */
-import { defaultSettings as DEFAULTS, normalizeSettings, validateSettings, selectionSettings } from '../translation/settings';
+import { defaultSettings as DEFAULTS, effectiveSettings, normalizeSettings, validateSettings, selectionSettings, SETTINGS_KEY } from '../translation/settings';
+import { parseSiteMatchPatterns, sitePatternMatchesUrl, sitePermissionOrigins } from './site-patterns';
 import { getSettings, saveSettings, resetSettings } from '../translation/preferences';
 import { TranslateError, buildEndpoint, endpointOrigin } from '../translation/vendor/api-base.js';
 import { translate as translateChat, buildBody as buildChatBody } from '../translation/vendor/deepseek.js';
@@ -13,6 +14,7 @@ import { translate as translateResponses, buildBody as buildResponsesBody } from
 import { describePrompt, describeGlossaryState, groupDirectHits } from './prompt.js';
 import { DUAL_TARGET_SHORT, formatDualForCopy, isDualOutput, parseDualOutput } from '../translation/vendor/dual.js';
 import { estimateCost } from '../translation/vendor/pricing.js';
+import { GLOSSARY_VERSION } from '../translation/protocol';
 import {
   buildIndex,
   buildSearchQuery,
@@ -34,8 +36,10 @@ import {
 
 const PORT_NAME = 'poe2ultra-selection';
 const MENU_ID = 'poe2ultra-translate-selection';
-const CONTENT_SCRIPT = 'content-scripts/selection.js';
+const CONTENT_SCRIPT = 'selection.js';
+const REGISTERED_SCRIPT_ID = 'poe2ultra-selection';
 const selectionArchive = new PersistentCache();
+let selectionRegistration = Promise.resolve();
 
 /** 按设置里的 API 形态挑客户端；两种形态对外接口完全一致。 */
 function pickClient(settings) {
@@ -80,17 +84,17 @@ const parseLocaleList = (raw, fallback = 'us,cn,tw') =>
 /* ------------------------------------------------------------------ 安装 */
 
 export function registerSelection() {
-chrome.runtime.onInstalled.addListener(async (details) => {
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: MENU_ID,
-      title: '翻译选中文本（DeepSeek）',
-      contexts: ['selection'],
-    });
+  const scheduleRegistration = () => {
+    selectionRegistration = selectionRegistration.then(syncSelectionRegistration, syncSelectionRegistration);
+  };
+  chrome.runtime.onInstalled.addListener(scheduleRegistration);
+  chrome.runtime.onStartup.addListener(scheduleRegistration);
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && SETTINGS_KEY in changes) scheduleRegistration();
   });
-
-
-});
+  chrome.permissions.onAdded.addListener(scheduleRegistration);
+  chrome.permissions.onRemoved.addListener(scheduleRegistration);
+  scheduleRegistration();
 
 /* ---------------------------------------------------------------- 上下文菜单 */
 
@@ -106,6 +110,15 @@ chrome.commands?.onCommand.addListener(async (command) => {
 });
 
 async function dispatchTranslateToTab(tab, frameId, selectionText) {
+  const settings = await getSettings();
+  if (!tab.url) return;
+  const matchingPatterns = parseSiteMatchPatterns(settings.selectionMatchPatterns)
+    .filter((pattern) => sitePatternMatchesUrl(pattern, tab.url));
+  let permitted = false;
+  for (const pattern of matchingPatterns) {
+    if (await chrome.permissions.contains({ origins: sitePermissionOrigins(pattern) })) { permitted = true; break; }
+  }
+  if (!permitted) return;
   const message = { type: 'translate-selection-command', text: selectionText };
   const options = frameId === undefined ? {} : { frameId };
   try {
@@ -122,6 +135,41 @@ async function dispatchTranslateToTab(tab, frameId, selectionText) {
       /* chrome:// 等受限页面，忽略 */
     }
   }
+}
+
+async function syncSelectionRegistration() {
+  const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [REGISTERED_SCRIPT_ID] }).catch(() => []);
+  if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: [REGISTERED_SCRIPT_ID] }).catch(() => {});
+
+  const settings = await getSettings();
+  const matches = parseSiteMatchPatterns(settings.selectionMatchPatterns);
+  const permittedMatches = [];
+  for (const pattern of matches) {
+    if (await chrome.permissions.contains({ origins: sitePermissionOrigins(pattern) })) permittedMatches.push(pattern);
+  }
+  await refreshSelectionContextMenu(permittedMatches);
+  if (!permittedMatches.length) return;
+  await chrome.scripting.registerContentScripts([{
+    id: REGISTERED_SCRIPT_ID,
+    matches: permittedMatches,
+    js: [CONTENT_SCRIPT],
+    runAt: 'document_idle',
+    allFrames: false,
+    persistAcrossSessions: true,
+  }]);
+}
+
+async function refreshSelectionContextMenu(matches) {
+  const patterns = matches ?? parseSiteMatchPatterns((await getSettings()).selectionMatchPatterns);
+  chrome.contextMenus.remove(MENU_ID, () => {
+    if (!patterns.length) return;
+    chrome.contextMenus.create({
+      id: MENU_ID,
+      title: '翻译选中文本（DeepSeek）',
+      contexts: ['selection'],
+      documentUrlPatterns: patterns,
+    });
+  });
 }
 
 /* -------------------------------------------------------------- 长连接翻译 */
@@ -162,7 +210,7 @@ async function runJob(port, jobs, msg) {
   };
 
   try {
-    const settings = await getSettings();
+    const settings = effectiveSettings(await getSettings());
     const text = String(msg.text || '');
     if (!text.trim()) throw new TranslateError('没有选中任何文本。');
     if (text.length > settings.maxChars) throw new TranslateError(`选中文本超过 ${settings.maxChars} 字符，请缩短选区。`);
@@ -228,7 +276,7 @@ async function runJob(port, jobs, msg) {
     if (!result.text) {
       throw new TranslateError('模型没有返回任何内容，请检查提示词或换一个模型试试。');
     }
-    const cost = settings.showCost === false ? null : estimateCost(result.usage, settings);
+    const cost = estimateCost(result.usage, { ...settings, costModel: 'auto', costAutoPeak: true });
     // 双版本模式：把【简中】【繁中】两段拆开下发，面板分栏展示、各自复制
     const dual = isDualOutput(settings) ? parseDualOutput(result.text) : null;
     const warnings = [...context.warnings];
@@ -281,17 +329,6 @@ async function checkHostPermission(baseUrl) {
   catch (error) { return error; }
 }
 
-/** 术语表分类统计，给设置页显示。 */
-function summarizeCategories(index) {
-  const counts = new Map();
-  for (const entry of index.en.values()) {
-    counts.set(entry.k, (counts.get(entry.k) || 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([category, count]) => ({ category, count }));
-}
-
 /** 用户导入的术语表被替换/清除后，丢掉进程内索引缓存。 */
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && OVERRIDE_KEY in changes) invalidateGlossary();
@@ -336,13 +373,15 @@ const MESSAGE_HANDLERS = {
     }
     return {
       activeSource: loaded?.source || '',
+      version: loaded?.source === 'imported'
+        ? (loaded.meta?.version || imported?.meta?.version || (loaded.meta?.importedAt ? `导入于 ${loaded.meta.importedAt.slice(0, 10)}` : '导入版本'))
+        : GLOSSARY_VERSION,
       bundled,
       indexSize: loaded?.index?.size || 0,
       collisions: loaded?.index?.collisions || 0,
       imported: imported
         ? { count: imported.meta?.count || imported.entries?.length || 0, importedAt: imported.meta?.importedAt || '' }
         : null,
-      categories: loaded ? summarizeCategories(loaded.index) : [],
     };
   },
   'clear-glossary-override': async () => {
@@ -352,17 +391,19 @@ const MESSAGE_HANDLERS = {
   },
   'glossary-test': async (msg) => {
     const loaded = await loadGlossary();
+    const settings = await getSettings();
+    const aliases = JSON.parse(settings.customTermAliases || '[]');
+    const index = buildIndex([...new Set(loaded.index.en.values())], aliases);
     const text = String(msg.text || '').trim();
     if (!text) throw new Error('请输入要测试的文字。');
-    const categories = String(msg.categories || '')
-      .split(/[,\s]+/)
-      .map((c) => c.trim())
-      .filter(Boolean);
-    const terms = extractTerms(text, loaded.index, {
-      maxTerms: Number(msg.maxTerms) || 20,
-      categories: categories.length ? categories : null,
-    });
-    return { terms, source: loaded.source, size: loaded.index.size };
+    const terms = extractTerms(text, index);
+    return { terms, source: loaded.source, size: loaded.index.size, aliasCount: aliases.length };
+  },
+  'glossary-canonical-options': async () => {
+    const loaded = await loadGlossary();
+    return [...new Map([...loaded.index.en.values()].map(entry => [entry.e, entry])).values()]
+      .filter(entry => entry.e && (entry.c || entry.t))
+      .map(entry => ({ en: entry.e, cn: entry.c, tw: entry.t, category: entry.k }));
   },
   'tavily-test': async (msg) => {
     const settings = normalizeSettings({ ...(await getSettings()), ...(msg.patch || {}) });
@@ -442,7 +483,7 @@ const MESSAGE_HANDLERS = {
       settings: { ...settings, stream: false, maxTokens: Math.min(settings.maxTokens || 256, 512) },
       input,
     });
-    const cost = estimateCost(result.usage, settings);
+    const cost = estimateCost(result.usage, { ...settings, costModel: 'auto', costAutoPeak: true });
     return {
       ok: true,
       model: result.model,

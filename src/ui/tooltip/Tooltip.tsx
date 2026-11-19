@@ -1,6 +1,7 @@
 import { BilingualText, useDisplayLocale } from '@/ui/translation/BilingualText';
 import { TranslationContext } from '@/ui/translation/BilingualText';
 import { uiRequirements, uiText } from '@/lib/ui/i18n';
+import { BASE_CSS } from '@/ui/styles';
 import type { ComponentChildren } from 'preact';
 import { createContext, render } from 'preact';
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -12,7 +13,7 @@ import { Icon } from '@/ui/common/Icon';
 const TOOLTIP_ID = 'guide-tooltip';
 
 interface TooltipApi {
-  open(anchor: HTMLElement, model: TooltipModel): void;
+  open(anchor: HTMLElement, model: TooltipModel, options?: { nativeStyle?: boolean; portalParent?: HTMLElement }): void;
   close(anchor?: HTMLElement): void;
   openAnchor: HTMLElement | null;
 }
@@ -21,13 +22,13 @@ const TooltipContext = createContext<TooltipApi | null>(null);
 
 /** One persistent, non-modal detail card; explicit activation switches its content, hover does not. */
 export function TooltipProvider({ children, resetKey }: { children: ComponentChildren; resetKey?: string }) {
-  const [open, setOpen] = useState<{ anchor: HTMLElement; model: TooltipModel } | null>(null);
+  const [open, setOpen] = useState<{ anchor: HTMLElement; model: TooltipModel; nativeStyle?: boolean; portalParent?: HTMLElement } | null>(null);
   const close = useCallback((anchor?: HTMLElement) => setOpen(current => (!anchor || current?.anchor === anchor ? null : current)), []);
   useEffect(() => close(), [resetKey, close]);
 
   const api = useMemo<TooltipApi>(
     () => ({
-      open: (anchor, model) => setOpen({ anchor, model }),
+      open: (anchor, model, options) => setOpen({ anchor, model, ...options }),
       close,
       openAnchor: open?.anchor ?? null,
     }),
@@ -50,9 +51,26 @@ export function TooltipProvider({ children, resetKey }: { children: ComponentChi
   return (
     <TooltipContext.Provider value={api}>
       {children}
-      {open && <TooltipOutsideOverlay anchor={open.anchor} model={open.model} onClose={() => close()} />}
+      {open && <TooltipOutsideOverlay
+        anchor={open.anchor}
+        model={open.model}
+        nativeStyle={open.nativeStyle}
+        portalParent={open.portalParent}
+        onClose={() => close()}
+      />}
     </TooltipContext.Provider>
   );
+}
+
+/** Opens the shared translated detail card from an interactive element outside the extension's shadow root. */
+export function TooltipLauncher({ request }: { request: { anchor: HTMLElement; model: TooltipModel; nativeStyle?: boolean; portalParent?: HTMLElement } | null }) {
+  const api = useContext(TooltipContext);
+  const open = useRef(api?.open);
+  open.current = api?.open;
+  useEffect(() => {
+    if (request) open.current?.(request.anchor, request.model, { nativeStyle: request.nativeStyle, portalParent: request.portalParent });
+  }, [request]);
+  return null;
 }
 
 export function WithTooltip({ model, children, openOnChildClick = false }: {
@@ -91,6 +109,7 @@ export function WithTooltip({ model, children, openOnChildClick = false }: {
         const owner = (event.target as Element).closest('.tooltip-trigger');
         if (owner !== ref.current) return;
         if (!openOnChildClick && (event.target as Element).closest('button, a, input, select, textarea')) return;
+        if (openOnChildClick && (event.target as Element).closest('a')) { event.preventDefault(); event.stopPropagation(); }
         if (isOpen) {
           api.close();
         } else {
@@ -118,16 +137,42 @@ export function WithTooltip({ model, children, openOnChildClick = false }: {
 }
 
 /** Outside the overlay's stacking context: the site's passive tree is laid over the overlay and would cover it. */
-function TooltipOutsideOverlay({ anchor, model, onClose }: { anchor: HTMLElement; model: TooltipModel; onClose: () => void }) {
+function TooltipOutsideOverlay({ anchor, model, nativeStyle = false, portalParent, onClose }: {
+  anchor: HTMLElement;
+  model: TooltipModel;
+  nativeStyle?: boolean;
+  portalParent?: HTMLElement;
+  onClose: () => void;
+}) {
   const layer = anchor.closest('.overlay')?.parentElement;
-  const tooltip = <TooltipLayer anchor={anchor} model={model} onClose={onClose} />;
-  return layer ? <Portal parent={layer}>{tooltip}</Portal> : tooltip;
+  const tooltip = <TooltipLayer anchor={anchor} model={model} nativeStyle={nativeStyle} onClose={onClose} />;
+  if (nativeStyle && portalParent) return <NativeBoardPortal parent={portalParent}>{tooltip}</NativeBoardPortal>;
+  if (layer) return <Portal parent={layer}>{tooltip}</Portal>;
+  // The native equipment board can sit above the extension's shadow host. Mount this tooltip
+  // in a separate, body-level shadow host so its stacking order is not capped by the guide UI.
+  return <DocumentPortal>{tooltip}</DocumentPortal>;
 }
 
-function TooltipLayer({ anchor, model, onClose }: { anchor: HTMLElement; model: TooltipModel; onClose: () => void }) {
+function TooltipLayer({ anchor, model, nativeStyle = false, onClose }: { anchor: HTMLElement; model: TooltipModel; nativeStyle?: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const locale = useDisplayLocale();
   const [placement, setPlacement] = useState<Placement | null>(null);
+
+  // Native Mobalytics gear uses an extreme z-index outside our shadow root.
+  // Put the detail card in the browser top layer so it can paint above that DOM.
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element || typeof element.showPopover !== 'function') return;
+    element.setAttribute('popover', 'manual');
+    try {
+      element.showPopover();
+      return () => {
+        if (element.matches(':popover-open')) element.hidePopover();
+      };
+    } catch {
+      // Keep the existing z-index positioning as a fallback in older browsers.
+    }
+  }, []);
 
   useLayoutEffect(() => {
     const element = ref.current;
@@ -154,7 +199,7 @@ function TooltipLayer({ anchor, model, onClose }: { anchor: HTMLElement; model: 
       role="dialog"
       aria-label={model.title}
       aria-modal="false"
-      class={`tooltip tooltip--${model.accent}`}
+      class={`tooltip tooltip--${model.accent}${nativeStyle ? ' tooltip--native' : ''}`}
       style={placement ? { left: `${placement.left}px`, top: `${placement.top}px` } : { visibility: 'hidden' }}
     >
       <div class="tooltip__controls">
@@ -184,21 +229,78 @@ function Portal({ parent, children }: { parent: Element; children: ComponentChil
   return null;
 }
 
+/** Mounts the native-style item details inside the site's equipment-board stacking layer. */
+function NativeBoardPortal({ parent, children }: { parent: HTMLElement; children: ComponentChildren }) {
+  const translations = useContext(TranslationContext);
+  const [target] = useState(() => {
+    const host = parent.ownerDocument.createElement('div');
+    host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
+    const shadow = host.attachShadow({ mode: 'open' });
+    const style = parent.ownerDocument.createElement('style');
+    style.textContent = BASE_CSS;
+    const container = parent.ownerDocument.createElement('div');
+    container.style.pointerEvents = 'none';
+    shadow.append(style, container);
+    return { host, container };
+  });
+  useLayoutEffect(() => {
+    parent.append(target.host);
+    return () => {
+      render(null, target.container);
+      target.host.remove();
+    };
+  }, [parent, target]);
+  useLayoutEffect(() => {
+    render(<TranslationContext.Provider value={translations}>{children}</TranslationContext.Provider>, target.container);
+  });
+  return null;
+}
+
+/** Renders a native-site tooltip in its own body-level shadow root above the guide host. */
+function DocumentPortal({ children }: { children: ComponentChildren }) {
+  const translations = useContext(TranslationContext);
+  const [target] = useState(() => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
+    const shadow = host.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = BASE_CSS;
+    const container = document.createElement('div');
+    container.style.pointerEvents = 'none';
+    shadow.append(style, container);
+    return { host, container };
+  });
+  useLayoutEffect(() => {
+    document.body.append(target.host);
+    return () => {
+      render(null, target.container);
+      target.host.remove();
+    };
+  }, [target]);
+  useLayoutEffect(() => {
+    render(<TranslationContext.Provider value={translations}>{children}</TranslationContext.Provider>, target.container);
+  });
+  return null;
+}
+
 function TooltipCard({ model }: { model: TooltipModel }) {
   const locale = useDisplayLocale();
+  const inlineGemName = model.subtitle === 'Skill Gem' || model.subtitle === 'Support Gem';
+  const inlinePassiveText = ['passive', 'notable', 'keystone', 'ascendancy'].includes(model.accent);
+  const inlineText = inlineGemName || inlinePassiveText;
   return (
     <>
       <div class="tooltip__header">
         <Icon src={model.iconUrl} class="tooltip__icon" missing="none" />
         <div>
-          <p class="tooltip__title"><BilingualText text={model.title} /></p>
+          <p class="tooltip__title"><BilingualText text={model.title} inline={inlineText} /></p>
           {model.subtitle && <p class="tooltip__subtitle">{uiText(model.subtitle, locale) === model.subtitle ? <BilingualText text={model.subtitle} /> : uiText(model.subtitle, locale)}</p>}
         </div>
       </div>
       {model.tags.length > 0 && (
         <ul class="tooltip__tags">
-          {model.tags.map((tag) => (
-            <li key={tag}><BilingualText text={tag} /></li>
+          {model.tags.map(tag => (
+            <li key={tag}><BilingualText text={tag} inline={inlineGemName} /></li>
           ))}
         </ul>
       )}
@@ -206,8 +308,8 @@ function TooltipCard({ model }: { model: TooltipModel }) {
         <dl class="tooltip__stats">
           {model.stats.map(({ name, value }) => (
             <div key={name}>
-              <dt><BilingualText text={name} /></dt>
-              <dd><BilingualText text={value} /></dd>
+              <dt>{uiText(name, locale) === name ? <BilingualText text={name} /> : uiText(name, locale)}</dt>
+                <dd><BilingualText text={name.toLowerCase() === 'reservation' ? `${value}${locale === 'en' ? ' Spirit' : '精魂'}` : value} /></dd>
             </div>
           ))}
         </dl>
@@ -219,7 +321,7 @@ function TooltipCard({ model }: { model: TooltipModel }) {
           {section.title && <p class="tooltip__section-title">{uiText(section.title, locale)}</p>}
           <ul>
             {(section.blocks ?? section.lines).map((line, j) => (
-              <li key={j}><BilingualText text={line} /></li>
+          <li key={j}><BilingualText text={line} inline={inlinePassiveText} /></li>
             ))}
           </ul>
         </div>
