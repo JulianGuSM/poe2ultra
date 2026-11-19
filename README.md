@@ -49,10 +49,10 @@ npm ci
 npm run build
 ```
 
-The unpacked Chrome extension is written to `.output/chrome-mv3`. To create distributable packages:
+The unpacked Chrome extension is written to `.output/chrome-mv3`. To create a distributable Chrome package:
 
 ```sh
-npm run zip
+npm run zip:store
 ```
 
 Packages are written under `.output/releases`. To rebuild the bundled terminology JSON from its CSV source, run `npm run build:poe2-terms`.

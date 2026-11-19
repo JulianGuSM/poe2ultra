@@ -52,7 +52,7 @@ npm run build
 未打包的 Chrome 扩展生成在 `.output/chrome-mv3`。生成发布包：
 
 ```sh
-npm run zip
+npm run zip:store
 ```
 
 发布包位于 `.output/releases`。如需从 CSV 源文件重新生成内置术语 JSON，运行 `npm run build:poe2-terms`。
