@@ -1,125 +1,73 @@
 # poe2ultra
 
-基于 [poe2perfect](https://github.com/ReSenpai/poe2perfect) 的 POE2 攻略阅读扩展，接入 Julian 的 DeepSeek 翻译逻辑，提供独立的简中、繁中译文与持久缓存。
+**English** · [简体中文](README.zh-CN.md)
 
-## 安装与使用
+poe2ultra is a Chrome extension for reading Path of Exile 2 build guides on [Mobalytics](https://mobalytics.gg/poe-2). It organizes guide content into focused panels and can translate guide text into Simplified and Traditional Chinese.
 
-### 首次安装
+## Features
 
-1. 在 Chrome 地址栏输入 `chrome://extensions`，打开右上角的 **开发者模式**。
-2. 点击 **加载未打包的扩展程序**，选择本项目的 **`.output/chrome-mv3`** 文件夹。当前电脑上的完整路径是：
+- Browse a guide through Overview, Skills, Gear, Passives and Atlas, and Progression panels.
+- Switch between English, Simplified Chinese, and Traditional Chinese. Original text stays available beside translated content.
+- Translate guides in batches, keep translations in a local cache, resume interrupted work, and retranslate individual text blocks.
+- Preserve links, icons, and clickable entity details in supported rich-text guide content.
+- Look up equipment through trade links, including Simplified Chinese searches on the China realm.
+- Translate selected text on websites you allow in settings, using the floating button, `Alt+Q`, or the context menu.
+- Configure translation providers, prompts, terminology, optional web lookup, diagnostics, and cost estimates.
 
-   ```text
-   C:\Users\Julian\Documents\ChatGPT\poe2ultra\.output\chrome-mv3
-   ```
+## Install from GitHub Releases
 
-   选中的文件夹内应直接包含 `manifest.json`。如果拿到的是扩展 ZIP 包，先解压，再选择包含该文件的文件夹；如果只有源码，先按下方[开发](#开发)说明安装依赖并构建，生成 `.output/chrome-mv3`。
-3. 确认扩展列表中出现并启用了 **poe2ultra**。在同一网站使用时，先停用原版 poe2perfect，避免同时接管页面。1.4.0 已整合 poe2translator 的划词功能；建议停用旧划词插件，避免出现两个浮标或快捷键冲突。
+Download the [latest release](https://github.com/JulianGuSM/poe2ultra/releases/latest). The release provides two Chrome packages:
 
-**“加载未打包的扩展程序”就是前文所说的“加载已解压的扩展程序”**，两者指同一个操作。Chrome 中请点击实际显示的“加载未打包的扩展程序”，选择文件夹即可。
+- **Personal build** (`poe2ultra-*-chrome-personal.zip`): includes CSV translation export.
+- **Chrome Store build** (`poe2ultra-*-chrome-store.zip`): packaged for Chrome Web Store submission.
 
-### 已安装后的更新
+To install the personal build manually:
 
-1. 将新构建或解压后的扩展文件放在**原安装目录**。
-2. 打开 `chrome://extensions`，在 **poe2ultra** 卡片上点击圆形箭头 **↻（重新加载）**。
-3. 如果 Chrome 提示新版新增网页访问权限，检查并启用扩展。普通网页划词现在只会在你设置的站点规则中启用。
-4. 打开翻译设置 → **划词与面板**，在“划词翻译适用网站”中添加规则并保存，然后刷新对应网页。
+1. Unzip the personal package.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Choose **Load unpacked** and select the extracted folder that directly contains `manifest.json`.
+4. Open or refresh a Mobalytics Path of Exile 2 guide.
 
-不需要卸载或再次添加。保持原安装目录并重新加载，可以保留扩展身份、设置和本地翻译缓存；卸载扩展会丢失这些本地数据。
+When updating, replace the files in the existing extension folder and click **Reload** on its card. Keeping the same folder and extension entry preserves local settings and translation cache. Avoid running another extension that also takes over the same guide page.
 
-若确实需要卸载或换浏览器，先进入 **翻译设置 → 攻略全文翻译与缓存 → 导出译文缓存（JSON）**，妥善保存下载的备份。重新安装后在同一位置选择备份并点击 **合并并恢复翻译参数**。导入会保留现有译文和累计费用记录，恢复匹配缓存所需的参数和已导入的官方术语表；API Key 需要在新安装中重新填写。刷新攻略页面后，已备份的文字块可直接读取简中、繁中译文，无需再次调用模型。备份包含译文、费用估算与自定义请求体等翻译配置，请检查内容后再分享。
+## Configure translation
 
-需要整理译文时，点击同一区域的 **导出累计译文（CSV）**，下载固定三列的 `英语原文,简中,繁中` 表格。扩展在本机持续积累攻略译文和已完成的双语划词译文，每次导出当前完整快照；重复的同一组三语文本只列一次。旧版攻略缓存没有明文原文，重新打开相应攻略后会自动补记，不会重新调用 API。CSV 是阅读和整理用的文件，卸载后恢复攻略缓存仍需上述 JSON 备份。浏览器扩展不会自动改写下载目录里的既有 CSV 文件。
+1. Open poe2ultra settings from the extension icon or the guide's settings control.
+2. Add an API key and save your provider settings. DeepSeek is the default endpoint; compatible custom endpoints can be configured.
+3. Return to a guide and start translation from the translation progress control. The extension creates both Chinese versions in batches.
+4. Use the language switch to show or hide cached translations. Switching languages does not itself send a translation request.
 
-### 配置与翻译
+Selection translation is opt-in by website. Add allowed URL patterns under **Selection & panel** in settings, save, then refresh the matching page. Automatic translation on text selection is off by default.
 
-1. 打开或刷新 Mobalytics 的 POE2 攻略页面，点击导航栏右侧、折叠和退出旁的**设置齿轮**打开插件设置；也可以通过环形翻译进度中的 **翻译设置**，或 Chrome 工具栏中的 poe2ultra 图标打开设置页。
-2. 在中文设置页的 **API 密钥** 中填写自己的 Key，点击 **保存设置**。已有 poe2ultra 设置继续保留；独立的旧 poe2translator 的 Key 和自定义设置不会自动迁移，需要手动复制。
-3. 返回攻略，点击环形进度，在详情框中点击橙色的 **开始翻译 · 简中 + 繁中**，按批次生成并保存两套独立译文。未缓存内容的模型翻译会调用你的 DeepSeek API。
-4. 原文始终保留。导航栏右侧的三段切换按钮选择 **英 / 简 / 繁**：中文译文显示在每个已翻译文本块下方，**英** 隐藏译文。切换语言不调用 API，未翻译的文本块先只显示原文。
-   攻略导航和技能、装备、天赋提示框中的固定标题会立即按所选语言显示，例如“总览 / 總覽”和“品质附加效果 / 品質附加效果”；这些界面文案不消耗 DeepSeek 额度。点击打开的详情提示框内，缓存译文使用更亮的浅灰色以便阅读。
-   悬停“英 / 简 / 繁”可查看说明，简体中文适配国服，繁体中文适配国际服。导航标签和语言切换保持同一行，空间不足时可横向滚动标签。点击向上箭头折叠攻略头部后，不再保留缩略标题。
-5. 中断后点击 **继续翻译剩余内容**，只补齐缺失部分。完成后刷新页面或再次打开攻略，原文相同的内容会直接使用缓存；即使翻译配置变化，也会优先显示已有译文。
+## Privacy
 
-**环形进度**位于语言切换左侧，和折叠、退出按钮组成导航栏右侧独立控件区。点击圆环可查看已缓存文字块、费用估算、当前批次、处理阶段、用时，以及开始/停止/继续操作；点 X、按 Esc 或点击框外关闭。等待 DeepSeek 返回时会显示等待状态，开始接收译文后显示本批已接收字符数。百分比只在每批校验并保存后增加；第一批完成前显示 0% 属于正常情况，接收字符数不是 token 数，也不代表已缓存。
+Translation settings and guide cache are stored in the browser profile. When you request translation, poe2ultra sends the relevant text and configured context to the translation provider you selected. Optional terminology services may receive lookup queries when enabled. Read the full [Privacy Notice](PRIVACY.md) before configuring a provider, and do not share cache backups or debug logs without reviewing their contents.
 
-详情框同时显示**本轮**和**这篇攻略累计**费用估算：按服务商返回的每次 token 用量和当时设置的计费模型/单价计算，包含返回格式错误但仍报告用量的请求。每次模型响应会留下一条本地费用记录，刷新和多次续译后仍可累计查看；备份 JSON 会带上记录，重复导入不会重复计费。缓存命中和本地术语替换不产生模型请求；缺少用量时会标注估算不完整。1.6.6 之前的请求没有保存费用记录，不能从译文倒推出实际支出。清空攻略译文不会清除已记费用；实际扣费以服务商账单为准。
+## Build from source
 
-**Debug 不控制续译。** 某批模型输出缺少简中/繁中或 JSON 无效时，该批不缓存，程序会继续翻译后面的批次；本轮结束后显示失败批数，点击 **继续翻译剩余内容** 只重试未缓存块。连续 3 批输出无效会暂停，避免反复产生费用；鉴权、网络或存储故障也会暂停，修复原因后可继续。开启 Debug 只用于保存排查日志。
-
-点击三语切换右侧的 **重译** 开启按需模式后，每个文字块旁才会显示 **重译** 按钮；点击即可单独重新处理并覆盖该块的译文，必要时会调用模型 API。英文显示模式下也能选块重译，完成后切换到简中或繁中查看结果。关闭按需模式会隐藏这些按钮。相同英文文字块在其他攻略中复用同一条缓存，因此覆盖后的译文也会在那里更新。
-
-含嵌入技能、物品等实体的攻略段落，现在会在译文中保留原图标和可点击的详情卡片。升级后这类段落会作为待译块；点击 **继续翻译** 补齐，或开启按需重译后只点目标段落旁的按钮。其余已缓存段落继续复用。
-
-**`已缓存 0 / 2,249 个文字块` 是什么意思？** 表示当前攻略所有构筑阶段共提取出 2,249 个去重后的文字块，目前还没有任何块保存了简中、繁中两套译文。它不是 API 请求次数；“待翻译字符”是剩余原文的字符数，也不是 token 数。
-
-1.5.0 改为整块翻译：将段落中的加粗、链接等文字合并成完整原文，直接发送给 DeepSeek，返回后缓存，并在原文下方显示淡灰色译文。已移除数字保护标记、数字校验和富文本片段位置/数量校验。旧版“0.5 被移到另一片段”的报错不会再阻止翻译。旧缓存可合并为整段译文继续显示，无需清空。
-
-仍然分批请求，每个文字块各自对应译文；不是整页塞进一次请求，也不是每个格式片段请求一次。
-
-1.5.1 将两套提示词完全分开：全文翻译集中在 [`guide-prompt.js`](src/lib/translation/guide-prompt.js)，系统提示词仅使用指定的 POE2 本地化专家文本，不再追加划词模板、术语规则或格式指令。每批原文、两地术语、poe2db 来源和 JSON 返回结构放在 user 数据中。划词提示词集中在 [`selection/prompt.js`](src/lib/selection/prompt.js)，设置页的自定义提示词只影响划词。已有全文缓存继续保留，修改划词提示词也不会触发全文重新翻译；新全文提示词用于后续待译内容。
-
-如果出现 **模型返回的 JSON 格式无效**，表示返回内容不能作为完整的双语数据读取。1.4.0 已为两种 API 开启 JSON 输出模式，并兼容完整 JSON 外的说明或代码块；仍异常时会显示空返回、未闭合或语法错误，以及返回片段。若明确提示达到输出上限，可调高 **最大输出 token** 或关闭思考模式，再手动继续；之前保存的缓存仍保留。
-
-### 网页划词翻译
-
-1. 先在翻译设置 → **划词与面板** 的“划词翻译适用网站”中配置允许使用划词翻译的网站；留空时不会向任何网页注入划词脚本。每行一条规则，例如 `https://bilibili.com/*`、`https://*.mobalytics.gg/*`，或 `https://example.com/guide/*`。保存时浏览器会申请对应站点权限。
-2. 刷新匹配的网站，在正文选中文字，点击选区旁的翻译浮标；也可按 **Alt+Q**，或右键选择 **翻译选中文本（DeepSeek）**。
-3. 面板会显示流式进度和译文，支持简中、繁中分别复制、原文展开、术语来源、提示词、费用估算、停止和重试。
-4. 在设置页调整 **划词与面板**，可开启自动划词翻译、修改面板宽度、主题及保留原文等选项。自动翻译默认关闭。若 Alt+Q 没反应，可在 `chrome://extensions/shortcuts` 检查快捷键是否被其他扩展占用。
-
-规则支持 `http://`、`https://` 或 `*://`，子域名可用 `*.example.com`，路径中可用 `*`；不接受匹配所有域名的规则。Chrome 内部页面、扩展商店和浏览器内置 PDF 等受限页面不支持。划词请求保留旧插件行为，每次触发会调用模型；成功拆出简中、繁中两版时会加入本地 CSV 累计记录。**避免重复调用模型的长期缓存仍仅用于攻略全文翻译**。
-
-### 可配置项目
-
-中文设置页沿用原插件的接口与模型、思考与流式输出、超时、额外请求头/请求体、提示词、本地术语表导入与测试、poe2db/Tavily 检索、划词面板和费用单价。设置自动保存；自定义接口首次使用需点击 **保存设置** 授权对应域名。划词和攻略全文翻译都使用这里的费用估算单价；内置单价不自动更新，可输入自己的实际单价。
-
-攻略始终生成简中、繁中两套译文；设置中的 **目标语言 / 划词翻译同时输出简中 + 繁中两个版本** 只控制划词。攻略缓存按原文哈希查找，并记录译文生成时的配置哈希。修改翻译参数或导入不同术语表后，旧译文仍会显示，不会自动重译；手动重译会以当前配置覆盖该文字块的缓存。主题、面板或费用设置不影响译文。
-
-### 出错时开启 Debug 日志
-
-1. 重新加载扩展并刷新攻略，进入 **翻译设置 → 6 · Debug 日志**。
-2. 勾选 **开启攻略翻译 Debug 模式**，点击 **保存设置**，然后回到攻略点击 **继续翻译剩余内容**。开关对下一次开始/继续生效，旧版已失败的请求无法追溯。
-3. 出错后回到设置，点击 **刷新日志**，按错误中的“调试记录”编号选择对应批次。展开即可查看完整输入、输出和处理日志。
-4. 点击 **导出全部调试日志（JSON）** 保存文件。也可在 `chrome://extensions` 的 poe2ultra 卡片打开 **Service Worker** 控制台，筛选 `[poe2ultra debug]` 查看实时日志。
-
-日志包含每批完整原文、术语上下文、最终请求体、HTTP 状态及解码后的完整响应（含 SSE）、模型原文与思考输出（如接口提供）、校验错误和缓存写入数量。中断请求保留已收到的部分，不会伪造缺失输出。成功批次也会记录。
-
-默认关闭，仅保存在本机，保留最近 **500 批**，超出后删除最早记录；导出会包含当前保留的全部批次。API 密钥及鉴权请求头会脱敏，日志仍包含完整攻略和自定义提示词。Debug 不改变缓存、不自动重试、不增加模型请求；已缓存内容不会为了日志重译。**清空调试日志**与清空译文缓存相互独立；关闭 Debug 后已有日志仍保留。
-
-1.5.0 不再校验富文本片段对齐。只检查返回数据能否读取、块编号能否对应、两种语言是否有非空译文；网络错误、缺少译文或截断仍会提示并保留已完成缓存。
-
-完整操作、缓存策略和全文翻译原理见 **[中文说明](docs/TRANSLATION.zh-CN.md)**。
-
-## 已实现
-
-- 只翻译结构化攻略内容，包含所有阶段、正文、技能/装备说明与扩展自己的提示框。
-- 复用 4,324 条简繁独立术语、本地抽取、poe2db 直查、可选 Tavily，以及两种 DeepSeek API 客户端。
-- 一批请求同时生成两套独立译文；术语表完整命中的独立名称无需模型请求。
-- IndexedDB 长期缓存，无自动过期；同段落跨攻略复用，更新只补变化内容，中断后续译。
-- 保留英文原文及其链接、加粗、技能标签，在每个文本块下方显示淡灰色译文。
-- 手动开始翻译，默认关闭思考与 Tavily；设置与密钥仅保存在本机。
-- 完整中文设置页和原插件划词面板，支持浮标、右键、Alt+Q，以及独立简繁复制。
-
-网站原生天赋树画布和原生悬浮框不在本版翻译范围内。旧插件的运行时 API Key、自定义提示词不会自动迁移。真实模型质量仍需加载扩展并填写 Key 后验证。
-
-## 开发
+Requirements: Node.js and npm.
 
 ```sh
 npm ci
-npm test
-npm run typecheck
 npm run build
-npm run zip
 ```
 
-也可使用仓库中的 pnpm lockfile：`pnpm install`，然后执行相同脚本。此环境验证使用 Node 24、pnpm 11；构建无需读取旧插件目录。
+The unpacked Chrome extension is written to `.output/chrome-mv3`. To create distributable packages:
 
-新代码集中在 `src/lib/translation`、`src/lib/selection`、`src/ui/translation`、`src/entrypoints/background.ts`、`src/entrypoints/selection.content.ts` 和 `src/entrypoints/options`。上游入口、解析器和阅读界面保留。
+```sh
+npm run zip:personal
+npm run zip:store
+```
 
-## 来源
+Packages are written under `.output/releases`. To rebuild the bundled terminology JSON from its CSV source, run `npm run build:poe2-terms`.
 
-- 上游：ReSenpai/poe2perfect，commit `5ad8bdb8923c4eccd5bb5e5c1d384e2d393c13b1`，GPL-3.0-or-later。
-- 翻译模块与术语库：Julian 提供的本地 poe2translator 1.7.0。源目录未修改。
-- 本地分支使用独立名称 poe2ultra 与独立图标，保留上游版权及许可证。
-- 上游原说明存档：[UPSTREAM-README.md](docs/UPSTREAM-README.md)。
+## More information
+
+- [简体中文说明](README.zh-CN.md)
+- [Detailed guide translation guide (Chinese)](docs/TRANSLATION.zh-CN.md)
+- [Changelog](CHANGELOG.md)
+- [Privacy Notice](PRIVACY.md)
+- [License](LICENSE)
+- [Upstream project notes](docs/UPSTREAM-README.md)
+
+poe2ultra is based on [ReSenpai/poe2perfect](https://github.com/ReSenpai/poe2perfect) and includes translation components and terminology data. See the [project notices](NOTICE) for attribution and licensing details.
