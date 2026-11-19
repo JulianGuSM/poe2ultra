@@ -16,14 +16,11 @@ poe2ultra is a Chrome extension for reading Path of Exile 2 build guides on [Mob
 
 ## Install from GitHub Releases
 
-Download the [latest release](https://github.com/JulianGuSM/poe2ultra/releases/latest). The release provides two Chrome packages:
+Download the Chrome ZIP from the [latest release](https://github.com/JulianGuSM/poe2ultra/releases/latest).
 
-- **Personal build** (`poe2ultra-*-chrome-personal.zip`): includes CSV translation export.
-- **Chrome Store build** (`poe2ultra-*-chrome-store.zip`): packaged for Chrome Web Store submission.
+To install the extension manually:
 
-To install the personal build manually:
-
-1. Unzip the personal package.
+1. Unzip the downloaded package.
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Choose **Load unpacked** and select the extracted folder that directly contains `manifest.json`.
 4. Open or refresh a Mobalytics Path of Exile 2 guide.
@@ -55,8 +52,7 @@ npm run build
 The unpacked Chrome extension is written to `.output/chrome-mv3`. To create distributable packages:
 
 ```sh
-npm run zip:personal
-npm run zip:store
+npm run zip
 ```
 
 Packages are written under `.output/releases`. To rebuild the bundled terminology JSON from its CSV source, run `npm run build:poe2-terms`.

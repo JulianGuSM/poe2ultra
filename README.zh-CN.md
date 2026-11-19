@@ -16,14 +16,11 @@ poe2ultra 是一款 Chrome 扩展，用于阅读 [Mobalytics](https://mobalytics
 
 ## 从 GitHub Releases 安装
 
-从 [最新版本](https://github.com/JulianGuSM/poe2ultra/releases/latest) 下载 Chrome 安装包。每个 Release 提供两个版本：
+从[最新版本](https://github.com/JulianGuSM/poe2ultra/releases/latest)下载 Chrome ZIP 安装包。
 
-- **自用版**（`poe2ultra-*-chrome-personal.zip`）：包含 CSV 译文导出功能。
-- **Chrome 商店版**（`poe2ultra-*-chrome-store.zip`）：用于提交到 Chrome 网上应用店。
+手动安装：
 
-手动安装自用版：
-
-1. 解压自用版 ZIP。
+1. 解压下载的 ZIP。
 2. 打开 `chrome://extensions`，启用右上角的**开发者模式**。
 3. 点击**加载未打包的扩展程序**，选择解压后直接包含 `manifest.json` 的文件夹。
 4. 打开或刷新 Mobalytics 上的《流放之路 2》攻略页面。
@@ -55,8 +52,7 @@ npm run build
 未打包的 Chrome 扩展生成在 `.output/chrome-mv3`。生成发布包：
 
 ```sh
-npm run zip:personal
-npm run zip:store
+npm run zip
 ```
 
 发布包位于 `.output/releases`。如需从 CSV 源文件重新生成内置术语 JSON，运行 `npm run build:poe2-terms`。
