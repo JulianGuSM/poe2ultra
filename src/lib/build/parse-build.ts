@@ -1,7 +1,7 @@
 import { type Obj, obj, objs, str, strings } from '@/lib/data/coerce';
 import type { RawBuildDocument, RawStaticData, RawWidget } from '@/lib/data/types';
 import type { Build, EntityInfo, TextSection, Variant } from './model';
-import { parseEquipment, socketableFromSlug, staticItem } from './parse-equipment';
+import { parseEquipment, parseJewels, socketableFromSlug, staticItem } from './parse-equipment';
 import { parseAtlas } from './parse-atlas';
 import { parsePassives, passiveFromSlug } from './parse-passives';
 import { parseQuestRewards } from './parse-quests';
@@ -94,6 +94,7 @@ function parseVariants(
       title,
       description: toRichText(obj(meta?.description)?.value),
       equipment: slots,
+      jewels: parseJewels(obj(raw.passiveTree)?.jewels, index),
       itemPriority,
       equipmentNotes: notes(WIDGET.equipment, 'descriptionPoeEquipment'),
       skills,

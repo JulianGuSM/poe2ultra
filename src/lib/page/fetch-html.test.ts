@@ -55,6 +55,6 @@ describe('createHtmlFetcher', () => {
 
     await fetcher(responses(403, 200))(URL, progress);
 
-    expect(progress).toHaveBeenCalledWith({ attempt: 2, attempts: 4 });
+    expect(progress).toHaveBeenCalledWith({ attempt: 2, attempts: 8 });
   });
 });

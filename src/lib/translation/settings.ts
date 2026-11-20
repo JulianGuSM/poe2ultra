@@ -11,6 +11,7 @@ export type Settings = Omit<typeof DEFAULTS, 'apiMode' | 'thinkingMode' | 'reaso
   theme: 'auto' | 'light' | 'dark';
   costModel: 'auto' | 'deepseek-flash' | 'deepseek-v4-pro' | 'custom';
   debugEnabled: boolean;
+  passiveTreeDebugEnabled: boolean;
   chinaTradeLeague: string;
   customTermAliases: string;
   selectionMatchPatterns: string;
@@ -18,9 +19,9 @@ export type Settings = Omit<typeof DEFAULTS, 'apiMode' | 'thinkingMode' | 'reaso
 };
 // Preserve the effective guide defaults from 1.3.2 while adding all original selection options.
 export const defaultSettings: Settings = { ...DEFAULTS, apiMode: 'responses', thinkingMode: 'disabled', reasoningEffort: 'high', theme: 'auto', costModel: 'auto',
-  maxTokens: 16384, timeoutMs: 120000, tavilyEnabled: false, showContext: false, debugEnabled: false, chinaTradeLeague: DEFAULT_CHINA_LEAGUE, customTermAliases: '[]', selectionMatchPatterns: '', advancedSettingsEnabled: false };
+  maxTokens: 16384, timeoutMs: 120000, tavilyEnabled: false, showContext: false, debugEnabled: false, passiveTreeDebugEnabled: false, chinaTradeLeague: DEFAULT_CHINA_LEAGUE, customTermAliases: '[]', selectionMatchPatterns: '', advancedSettingsEnabled: false };
 
-const advancedSettingKeys = ['poe2dbDirectEnabled', 'poe2dbLocales', 'poe2dbMaxTerms', 'poe2dbRequestBudget', 'tavilyEnabled', 'tavilyMaxResults', 'tavilyDomains', 'tavilyApiKey', 'customTermAliases', 'debugEnabled', 'chinaTradeLeague'] as const;
+const advancedSettingKeys = ['poe2dbDirectEnabled', 'poe2dbLocales', 'poe2dbMaxTerms', 'poe2dbRequestBudget', 'tavilyEnabled', 'tavilyMaxResults', 'tavilyDomains', 'tavilyApiKey', 'customTermAliases', 'debugEnabled', 'passiveTreeDebugEnabled', 'chinaTradeLeague'] as const;
 export function effectiveSettings(settings: Settings): Settings {
   const normalized = { ...settings, glossaryEnabled: true };
   if (settings.advancedSettingsEnabled) return normalized;

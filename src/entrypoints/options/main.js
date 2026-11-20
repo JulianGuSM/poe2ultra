@@ -16,7 +16,7 @@ const $ = (id) => document.getElementById(id);
 
 const CHECKBOXES = [
   'showButton', 'autoTranslate', 'keepSource', 'autoClosePanel', 'showPrompt',
-  'dualOutput', 'debugEnabled',
+  'dualOutput', 'debugEnabled', 'passiveTreeDebugEnabled',
   'showContext', 'poe2dbDirectEnabled', 'tavilyEnabled',
 ];
 const TEXTS = [

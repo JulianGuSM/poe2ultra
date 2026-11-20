@@ -41,7 +41,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
  * visitor's own session, which the page itself was loaded with.
  */
 export function createHtmlFetcher(fetchImpl: typeof fetch = (input, init) => fetch(input, init), options: HtmlFetcherOptions = {}): HtmlFetcher {
-  const { attempts = 4, sleep = wait, delayMs = (waited) => 700 * 2 ** waited, attemptMs = 15_000, timer = wait, onAttempt } = options;
+  const { attempts = 8, sleep = wait, delayMs = (waited) => 700 * 2 ** waited, attemptMs = 15_000, timer = wait, onAttempt } = options;
 
   return async (url, onProgress) => {
     let failure: unknown = new Error('No attempt was made');

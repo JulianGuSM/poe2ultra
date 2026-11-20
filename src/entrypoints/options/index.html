@@ -67,7 +67,8 @@
     <div class="settings-tabs" role="tablist" aria-label="设置分类">
       <button id="settings-tab-api" class="settings-tab" type="button" role="tab" aria-selected="true" aria-controls="settings-panel-api" tabindex="0" data-settings-tab="api">模型</button>
       <button id="settings-tab-selection" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-selection" tabindex="-1" data-settings-tab="selection">划词翻译</button>
-      <button id="settings-tab-advanced" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-advanced" aria-describedby="advanced-settings-tooltip" tabindex="-1" data-settings-tab="advanced">高阶设置<span class="tooltip-help settings-tab-help"><span class="tooltip-help__trigger" aria-hidden="true">?</span><span id="advanced-settings-tooltip" class="tooltip-help__content" role="tooltip">术语表、联网补充和 Debug 日志属于高阶配置，建议熟悉插件后再开启。开启后才能编辑并应用。</span></span></button>
+      <button id="settings-tab-glossary" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-glossary" tabindex="-1" data-settings-tab="glossary">术语表</button>
+      <button id="settings-tab-advanced" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-advanced" aria-describedby="advanced-settings-tooltip" tabindex="-1" data-settings-tab="advanced">高阶设置<span class="tooltip-help settings-tab-help"><span class="tooltip-help__trigger" aria-hidden="true">?</span><span id="advanced-settings-tooltip" class="tooltip-help__content" role="tooltip">联网补充和 Debug 日志属于高阶配置，建议熟悉插件后再开启。开启后才能编辑并应用。</span></span></button>
     </div>
 
     <!-- 1. 接口 -->
@@ -276,8 +277,8 @@
       </section>
     </section>
 
-    <div id="settings-panel-glossary" class="settings-panel advanced-gated" data-settings-panel="advanced" data-advanced-controls aria-disabled="true" hidden inert>
-    <!-- 4. 术语表与联网补充 -->
+    <div id="settings-panel-glossary" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-glossary" data-settings-panel="glossary" tabindex="0" hidden>
+    <!-- 术语表 -->
     <section class="card">
       <div class="card-titlebar">
         <div class="titlebar-heading">
@@ -323,7 +324,9 @@
         </div>
       </details>
     </section>
+    </div>
 
+    <div class="settings-panel advanced-gated" data-settings-panel="advanced" data-advanced-controls aria-disabled="true" hidden inert>
     <section class="card ws-search-card">
       <div class="card-titlebar"><h2>联网搜索</h2></div>
       <div class="ws-block">
@@ -459,6 +462,18 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+      <section class="debug-block">
+        <div class="debug-heading-row">
+          <h3>天赋树加载 Debug 日志</h3>
+          <div class="switch switch-checkbox debug-heading-switch">
+            <input id="passiveTreeDebugEnabled" type="checkbox" aria-label="开启天赋树加载 Debug 日志" aria-describedby="passive-tree-debug-hint" />
+            <label for="passiveTreeDebugEnabled" aria-hidden="true"></label>
+          </div>
+        </div>
+        <div class="debug-content">
+          <p class="hint" id="passive-tree-debug-hint">在攻略页面控制台记录树区域查找、网页渲染等待、重试和 DOM 变更频率。开启高阶设置后生效。</p>
         </div>
       </section>
       <section class="debug-block">

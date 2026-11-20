@@ -50,6 +50,34 @@ export function parseEquipment(raw: unknown, index: StaticIndex): { slots: Equip
   return { slots, itemPriority: parseItemPriority(equipment.priorityList) };
 }
 
+/** Parse the passive tree's configured jewels, which are separate from equipment slots. */
+export function parseJewels(raw: unknown, index: StaticIndex): Item[] {
+  return objs(raw).flatMap((entry) => {
+    const jewel = obj(entry.jewel);
+    const data = obj(jewel?.data);
+    const entity = obj(jewel?.entityV2);
+    if (!jewel || !data) return [];
+
+    const slug = str(entity?.slug) ?? str(data.slug) ?? str(jewel.slug) ?? str(entry.nodeSlug);
+    const name = str(data.name) ?? str(entity?.name);
+    if (!slug || !name) return [];
+    const explicit = objs(data.explicitMods).flatMap((mod) => str(mod.text) ?? str(mod.description) ?? []);
+    const implicit = objs(data.implicitMods).flatMap((mod) => str(mod.text) ?? str(mod.description) ?? []);
+    const rarity = str(data.rarity)?.toUpperCase();
+    const item = parseItem({
+      slug,
+      name,
+      isUnique: rarity === 'UNIQUE',
+      iconURL: str(entity?.iconURL) ?? str(entity?.icon) ?? str(jewel.iconURL),
+      itemClassSlug: 'jewel',
+      explicitDescriptions: explicit.map((description) => ({ description })),
+      flavourText: str(data.flavourText) ?? str(entity?.flavourText),
+      modifiers: data.corrupted === true ? ['Corrupted'] : [],
+    }, index);
+    return item ? [{ ...item, implicits: implicit.length ? implicit : item.implicits }] : [];
+  });
+}
+
 function parseSlot(slot: SlotId, weaponSet: 1 | 2 | null, raw: unknown, index: StaticIndex): EquipmentSlot | null {
   const rawSlot = obj(raw);
   const item = parseItem(obj(rawSlot?.commonItem), index);

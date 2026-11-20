@@ -19,9 +19,11 @@ export function embedSiteGear({
   placeholder,
   variantIndex,
   itemIcons,
+  jewelIcons,
   itemTradeUrls,
   socketableCounts,
   onSelectItem,
+  onSelectJewel,
   onSelectSocketable,
   onStatus,
 }: {
@@ -30,9 +32,11 @@ export function embedSiteGear({
   placeholder: HTMLElement;
   variantIndex: number;
   itemIcons: Map<string, number[]>;
+  jewelIcons: Map<string, number[]>;
   itemTradeUrls: (string | null)[];
   socketableCounts: number[];
   onSelectItem: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
+  onSelectJewel: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
   onSelectSocketable: (equipmentIndex: number, socketableIndex: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
   onStatus: (status: GearEmbedStatus) => void;
 }): GearEmbed {
@@ -46,6 +50,18 @@ export function embedSiteGear({
   let moveFrame: number | null = null;
   const containers = new Map<HTMLElement, string>();
   const scroller = placeholder.closest<HTMLElement>('.build-view__panel');
+  const originalStageHeight = placeholder.style.getPropertyValue('--gear-native-height');
+  const originalStageHeightPriority = placeholder.style.getPropertyPriority('--gear-native-height');
+
+  const fitStageToBoard = () => {
+    if (!board) return;
+    // Jewels sit below the equipment grid. Grow the placeholder to the complete
+    // native board height so its lower rows are not clipped by the preview size.
+    const height = Math.ceil(Math.max(board.element.scrollHeight, board.element.getBoundingClientRect().height));
+    const current = Number.parseFloat(placeholder.style.getPropertyValue('--gear-native-height'));
+    if (Number.isFinite(current) && Math.abs(current - height) < 1) return;
+    placeholder.style.setProperty('--gear-native-height', `${height}px`);
+  };
 
   const setStatus = (next: GearEmbedStatus) => {
     if (next === 'loading') retryTimer ??= setTimeout(() => { retryTimer = null; sync(); }, RETRY_MS);
@@ -67,6 +83,7 @@ export function embedSiteGear({
 
   const place = (animate = false) => {
     if (!board) return;
+    fitStageToBoard();
     const box = placeholder.getBoundingClientRect();
     const panel = scroller?.getBoundingClientRect();
     const clip = {
@@ -141,6 +158,8 @@ export function embedSiteGear({
       const controlRect = controlsElement?.getBoundingClientRect();
       const boardRect = boardElement.getBoundingClientRect();
       board = { element: boardElement, style: boardElement.getAttribute('style') };
+      boardResizeObserver?.disconnect();
+      boardResizeObserver?.observe(boardElement);
       setControls = controlsElement && !boardElement.contains(controlsElement)
         ? {
             element: controlsElement,
@@ -200,6 +219,14 @@ export function embedSiteGear({
       onSelectItem(itemIndex, target, board.element);
       return;
     }
+    const jewelMatches = jewelIcons.get(icon);
+    const jewelIndex = jewelMatches?.[position] ?? jewelMatches?.[0];
+    if (jewelIndex !== undefined) {
+      event.preventDefault();
+      event.stopPropagation();
+      onSelectJewel(jewelIndex, target, board.element);
+      return;
+    }
   };
   doc.addEventListener('click', onClick, true);
 
@@ -222,6 +249,10 @@ export function embedSiteGear({
   observer.observe(doc.body, { childList: true, subtree: true });
   const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(placeImmediately);
   resizeObserver?.observe(placeholder);
+  const boardResizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+    fitStageToBoard();
+    placeImmediately();
+  });
   win.addEventListener('resize', placeImmediately);
   // The embedded nodes are fixed in the page DOM; follow scrolling from the guide panel and any ancestor scroller.
   win.addEventListener('scroll', placeImmediately, true);
@@ -241,7 +272,10 @@ export function embedSiteGear({
       win.removeEventListener('scroll', placeImmediately, true);
       win.removeEventListener('wheel', onWheel, true);
       doc.removeEventListener('click', onClick, true);
+      boardResizeObserver?.disconnect();
       release();
+      if (originalStageHeight) placeholder.style.setProperty('--gear-native-height', originalStageHeight, originalStageHeightPriority);
+      else placeholder.style.removeProperty('--gear-native-height');
       containers.forEach((value, node) => {
         if (value) node.style.setProperty('container-type', value);
         else node.style.removeProperty('container-type');

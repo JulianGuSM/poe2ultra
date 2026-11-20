@@ -45,6 +45,7 @@ export function SkillsPanel({
           {variant.gemPriority.length > 0 && (
             <GemPriorityCard
               entries={variant.gemPriority}
+              skills={variant.skills}
               currentSkillSlug={skill.gem.slug}
               onPointAt={setPointedAt}
               onCopy={copyName}
@@ -56,7 +57,7 @@ export function SkillsPanel({
             <section class="card skills__list">
               <div class="skills__heading">
                 <h2 class="card__title">{uiText('Active Skills', locale)}</h2>
-                {variant.gemRequirements && <span class="skills__requirements">{formatAttributes(variant.gemRequirements)}</span>}
+                {variant.gemRequirements && <span class="skills__requirements">{formatAttributes(variant.gemRequirements, locale)}</span>}
               </div>
               <ul class="skill-rows" aria-label="Active skills">
                 {variant.skills.map((entry, i) => (
@@ -161,6 +162,7 @@ function SkillRow({
 
 function GemPriorityCard({
   entries,
+  skills,
   currentSkillSlug,
   onPointAt,
   onCopy,
@@ -168,6 +170,7 @@ function GemPriorityCard({
   onToggle,
 }: {
   entries: GemPriorityEntry[];
+  skills: Skill[];
   currentSkillSlug: string;
   onPointAt: (pointer: GemPointer | null) => void;
   onCopy: (name: string) => void;
@@ -195,7 +198,11 @@ function GemPriorityCard({
         </button>
       </div>
       <ol class="gem-priority__list" aria-label="Gem priority">
-        {entries.map((entry, i) => (
+        {entries.map((entry, i) => {
+          const parentGem = entry.parentSlug
+            ? skills.find((skill) => skill.gem.slug === entry.parentSlug)?.gem
+            : undefined;
+          return (
           <li
             key={`${entry.gem.slug}-${i}`}
             class={entry.parentSlug === currentSkillSlug ? 'gem-priority__row gem-priority__row--current' : 'gem-priority__row'}
@@ -210,16 +217,29 @@ function GemPriorityCard({
                 <GemIcon gem={entry.gem} class={`gem-priority__icon gem-socket gem-socket--${gemAttribute(entry.gem) ?? 'none'}`} />
                 <span class="gem-priority__text">
                   <span class="gem-priority__name"><BilingualText text={entry.gem.name} /></span>
-                  {entry.parentName && (
-                    <span class="gem-priority__parent" title={entry.parentName}>
-                      <BilingualText text={entry.parentName} />
-                    </span>
-                  )}
                 </span>
               </button>
             </WithTooltip>
+            {parentGem ? (
+              <WithTooltip model={gemTooltip(parentGem)} openOnChildClick>
+                <button
+                  type="button"
+                  class="gem-priority__parent gem-copy"
+                  aria-label={`Show details for ${entry.parentName ?? parentGem.name}`}
+                  title={entry.parentName ?? parentGem.name}
+                >
+                  <GemIcon gem={parentGem} class={`gem-priority__parent-icon gem-socket gem-socket--${gemAttribute(parentGem) ?? 'none'}`} />
+                  <span class="gem-priority__parent-label">{entry.parentName ?? parentGem.name}</span>
+                </button>
+              </WithTooltip>
+            ) : entry.parentName ? (
+              <span class="gem-priority__parent gem-priority__parent--text" title={entry.parentName}>
+                <BilingualText text={entry.parentName} />
+              </span>
+            ) : null}
           </li>
-        ))}
+          );
+        })}
       </ol>
     </section>
   );
@@ -229,6 +249,6 @@ function GemIcon({ gem, class: className }: { gem: Gem; class: string }) {
   return <Icon src={gem.iconUrl} class={className} kind="gem" />;
 }
 
-function formatAttributes({ str, dex, int }: Attributes): string {
-  return `Str ${str} · Dex ${dex} · Int ${int}`;
+function formatAttributes({ str, dex, int }: Attributes, locale: ReturnType<typeof useDisplayLocale>): string {
+  return `${uiText('Str', locale)} ${str} · ${uiText('Dex', locale)} ${dex} · ${uiText('Int', locale)} ${int}`;
 }

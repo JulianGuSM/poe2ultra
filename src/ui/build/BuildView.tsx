@@ -61,12 +61,41 @@ export function BuildView({
   const [route, setRoute] = useState<Route>(() => parseRoute(initialHash, sourceBuild, defaultTab, defaultVariant));
   const [passivesMounted, setPassivesMounted] = useState(route.tab === 'passives');
 
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      console.error('[poe2ultra] window error', {
+        message: event.message,
+        filename: event.filename,
+        line: event.lineno,
+        column: event.colno,
+        error: event.error,
+      });
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('[poe2ultra] unhandled rejection', event.reason);
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, []);
+
+  useEffect(() => {
+    console.info('[poe2ultra] route rendered', { tab: route.tab, variantId: route.variantId });
+  }, [route.tab, route.variantId]);
+
   useEffect(() => subscribeToHash?.((hash) => setRoute(parseRoute(hash, sourceBuild))), [subscribeToHash, sourceBuild]);
   useEffect(() => {
     if (route.tab === 'passives') setPassivesMounted(true);
   }, [route.tab]);
 
   const navigate = (next: Route) => {
+    console.info('[poe2ultra] navigation requested', {
+      from: { tab: route.tab, variantId: route.variantId },
+      to: { tab: next.tab, variantId: next.variantId },
+    });
     if (next.tab !== route.tab) onTabChange?.(next.tab);
     if (next.variantId !== route.variantId) {
       const picked = sourceBuild.variants.find((v) => v.id === next.variantId);
@@ -141,7 +170,7 @@ export function BuildView({
             <OverviewPanel build={build} />
           )}
           {tab.hasVariant && !variant && <p class="panel-empty">{NO_VARIANTS}</p>}
-          {route.tab === 'gear' && variant && <GearPanel variant={variant} variantIndex={build.variants.indexOf(variant)} entities={build.entities} />}
+          {route.tab === 'gear' && variant && <GearPanel key={variant.id} variant={variant} variantIndex={build.variants.indexOf(variant)} entities={build.entities} />}
           {route.tab === 'skills' && variant && <SkillsPanel key={variant.id} variant={variant} entities={build.entities} />}
           {passivesMounted && variant && (
             <div style={route.tab === 'passives' ? { display: 'contents' } : { display: 'none' }} aria-hidden={route.tab !== 'passives'}>

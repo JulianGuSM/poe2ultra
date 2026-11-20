@@ -61,6 +61,8 @@ export interface Variant {
   title: string;
   description: RichText | null;
   equipment: EquipmentSlot[];
+  /** Jewels socketed in the passive tree, shown below the site's gear board. */
+  jewels?: Item[];
   itemPriority: ItemRef[];
   equipmentNotes: RichText | null;
   skills: Skill[];

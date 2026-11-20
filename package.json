@@ -1,6 +1,6 @@
 {
   "name": "poe2ultra",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "A clean, tabbed view of Path of Exile 2 build guides on mobalytics.gg",
   "license": "GPL-3.0-or-later",

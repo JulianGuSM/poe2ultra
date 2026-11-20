@@ -14,12 +14,12 @@ const errorMessage = error => error instanceof Error ? error.message : String(er
 function buildFormatRepairPrompt(prompt, invalidOutput, validationError) {
   const source = JSON.parse(prompt.userText);
   return {
-    systemText: `${prompt.systemText}\n\n输出修复任务：上一轮译文未通过格式校验。请依据用户消息中的原始 segments 与 output_format，修正并重新输出完整结果。保留原译文内容中正确的翻译，只修复 JSON 结构、字段类型、段落数量或 id 对应关系。只输出符合 schema 的 JSON 对象，不要解释、不要 Markdown。`,
+    systemText: `${prompt.systemText}\n\n输出修复任务：上一轮译文未通过格式校验。请依据用户消息中的原始 segments、validation_error 与 output_format，修正并重新输出完整结果。保留正确的译文，只修复校验错误指出的问题。\n\n实体标签必须严格按原始 segments 中该段的 entities 数组输出：widget_labels 条数必须与 entities 条数完全相同；按顺序逐项对应并使用相同 index。entities 缺失或为空时，widget_labels 必须是空数组。不得根据正文中的词语、术语表或你的判断新增实体标签；数量过多时删除多余项，数量不足时只补齐原始 entities 中缺少的项。\n\n只输出符合 schema 的完整 JSON 对象，不要解释、不要 Markdown。`,
     userText: JSON.stringify({
       original_request: source,
       validation_error: validationError,
       invalid_output: invalidOutput,
-      repair_instruction: '请返回一个完整、可解析且符合 original_request.output_format.schema 的 JSON 对象。',
+      repair_instruction: '优先修复 validation_error 指出的具体问题。逐条对照 original_request.input.text 中的 segments：每条输出的 widget_labels 数量必须严格等于该 segment.entities 的数量；无 entities 的段落必须输出空数组。不要把正文或术语表中的普通术语转换成 widget entity。重新输出全部 translations，并确保完整 JSON 符合 original_request.output_format.schema。',
     }),
   };
 }

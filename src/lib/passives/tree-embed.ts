@@ -1,5 +1,6 @@
 import { FOCUS_ALLOWED_ATTRIBUTE } from '@/lib/page/focus-guard';
 import type { Passive } from '@/lib/build/model';
+import { SETTINGS_KEY } from '@/lib/translation/settings';
 import { findTreeSection, findTreeSlot, findVariantSection, selectSiteVariant, type TreeKind } from './site-tree';
 
 export type TreeEmbedStatus = 'loading' | 'ready' | 'missing';
@@ -60,6 +61,28 @@ export function embedSiteTree({
   // The site rewrites the URL for a variant and drops the hash the guide keeps its route in.
   let hashBeforeClick = '';
   let destroyed = false;
+  let debugEnabled = false;
+  let mutationBatches = 0;
+  let mutationRecords = 0;
+  let mutationReportTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const log = (event: string, details: Record<string, unknown> = {}) => {
+    if (debugEnabled) console.info('[poe2ultra passive tree]', event, { kind, ...details });
+  };
+  const refreshDebugSetting = () => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+    void chrome.storage.local.get(SETTINGS_KEY).then((saved) => {
+      const settings = saved[SETTINGS_KEY] as { advancedSettingsEnabled?: boolean; passiveTreeDebugEnabled?: boolean } | undefined;
+      const wasEnabled = debugEnabled;
+      debugEnabled = settings?.advancedSettingsEnabled === true && settings?.passiveTreeDebugEnabled === true;
+      if (debugEnabled && !wasEnabled) log('debug logging enabled');
+    }).catch(() => {});
+  };
+  refreshDebugSetting();
+  const onStorageChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+    if (area === 'local' && SETTINGS_KEY in changes) refreshDebugSetting();
+  };
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) chrome.storage.onChanged.addListener(onStorageChanged);
 
   // The canvas remains in the site's DOM, outside the guide's shadow root. Catch Ctrl+wheel
   // before either tree handles it, including overlays and gaps while the site remounts a variant.
@@ -80,10 +103,11 @@ export function embedSiteTree({
   pageStyle.textContent = PAGE_CSS;
   doc.head.append(pageStyle);
 
-  const setStatus = (next: TreeEmbedStatus) => {
+  const setStatus = (next: TreeEmbedStatus, details: Record<string, unknown> = {}) => {
     if (next === 'loading') scheduleRetry();
     else stopRetry();
     if (next === status) return;
+    log('status', { from: status, to: next, ...details });
     status = next;
     onStatus(next);
   };
@@ -94,6 +118,7 @@ export function embedSiteTree({
       clickedFor = new WeakMap();
       scrolled = new WeakSet();
       scrollAway = !scrollAway;
+      log('retry', { wantedVariant: wanted, scrollAway });
       sync();
     }, RETRY_MS);
   };
@@ -164,18 +189,27 @@ export function embedSiteTree({
 
   const sync = () => {
     if (destroyed) return;
+    const started = performance.now();
+    const finish = (outcome: string, details: Record<string, unknown> = {}) => {
+      const durationMs = Math.round((performance.now() - started) * 100) / 100;
+      if (durationMs >= 25) log('slow sync', { durationMs, outcome, ...details });
+    };
     if (!isActive) {
       releaseSlot();
+      finish('inactive');
       return;
     }
     restoreHash();
+    const lookupStarted = performance.now();
     const found = findTreeSection(doc, kind);
+    const lookupMs = Math.round((performance.now() - lookupStarted) * 100) / 100;
     if (!found || found.variantIndex !== wanted) {
       releaseSlot();
       // Without a tree section (e.g. no atlas for the variant the site shows), switch through another widget.
       const shown = found ?? findVariantSection(doc);
       if (!shown || shown.variantIndex === wanted) {
-        setStatus('missing');
+        setStatus('missing', { reason: 'variant section unavailable', wantedVariant: wanted, foundVariant: found?.variantIndex ?? null, lookupMs });
+        finish('missing', { lookupMs });
         return;
       }
       const { section } = shown;
@@ -184,7 +218,8 @@ export function embedSiteTree({
         if (selectSiteVariant(section, wanted)) clickedFor.set(section, wanted);
         restoreHash();
       }
-      setStatus('loading');
+      setStatus('loading', { reason: 'switching site variant', wantedVariant: wanted, foundVariant: shown.variantIndex, lookupMs });
+      finish('switching variant', { lookupMs });
       return;
     }
 
@@ -201,7 +236,8 @@ export function embedSiteTree({
         if (scrollAway) win.scrollTo(0, 0);
         else section.scrollIntoView({ block: 'center', behavior: 'instant' });
       }
-      setStatus('loading');
+      setStatus('loading', { reason: 'waiting for tree canvas', wantedVariant: wanted, lookupMs, scrolledIntoView: scrolled.has(section) });
+      finish('waiting for canvas', { lookupMs });
       return;
     }
 
@@ -213,11 +249,24 @@ export function embedSiteTree({
       liftContainers(element);
     }
     place();
-    setStatus('ready');
+    setStatus('ready', { reason: 'tree canvas found', wantedVariant: wanted, lookupMs });
+    finish('ready', { lookupMs });
   };
 
   let pending = false;
-  const observer = new MutationObserver(() => {
+  const observer = new MutationObserver((records) => {
+    if (debugEnabled) {
+      mutationBatches++;
+      mutationRecords += records.length;
+      if (mutationReportTimer === null) {
+        mutationReportTimer = setTimeout(() => {
+          mutationReportTimer = null;
+          log('DOM mutation activity', { batches: mutationBatches, records: mutationRecords, status });
+          mutationBatches = 0;
+          mutationRecords = 0;
+        }, 5000);
+      }
+    }
     if (pending) return;
     pending = true;
     queueMicrotask(() => {
@@ -258,6 +307,8 @@ export function embedSiteTree({
       resizeObserver?.disconnect();
       win.removeEventListener('resize', place);
       win.removeEventListener('wheel', preventPageZoom, true);
+      if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) chrome.storage.onChanged.removeListener(onStorageChanged);
+      if (mutationReportTimer !== null) clearTimeout(mutationReportTimer);
       releaseSlot();
       containers.forEach((value, node) => {
         if (value) node.style.setProperty('container-type', value);

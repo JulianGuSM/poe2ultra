@@ -7,7 +7,7 @@ import { FORMAT_VERSION, GLOSSARY_VERSION } from './protocol';
 
 describe('shared full-page and selection settings', () => {
   it('retains every original configuration option and upgrades existing saved keys', () => {
-    expect(Object.keys(defaultSettings).sort()).toEqual([...Object.keys(DEFAULTS), 'debugEnabled', 'chinaTradeLeague'].sort());
+    expect(Object.keys(defaultSettings).sort()).toEqual([...Object.keys(DEFAULTS), 'debugEnabled', 'passiveTreeDebugEnabled', 'chinaTradeLeague'].sort());
     const upgraded = normalizeSettings({ apiKey: 'existing-key', thinkingMode: 'enabled', model: 'custom-model' });
     expect(upgraded).toMatchObject({ apiKey: 'existing-key', model: 'custom-model', thinkingMode: 'enabled', showButton: true, autoTranslate: false, chinaTradeLeague: '周年庆巅峰挑战' });
     expect(() => validateSettings(upgraded)).not.toThrow();
