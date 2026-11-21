@@ -14,7 +14,10 @@ export function parseQuestRewards(raw: unknown, index?: StaticIndex): QuestAct[]
 
     if (!acts.has(act)) acts.set(act, { act, quests: [] });
     const choices = Array.isArray(quest.rewards) ? quest.rewards.length : 0;
-    const categories: QuestRewardCategory[] = index?.questCategories(name, act) ?? [];
+    const categories: QuestRewardCategory[] = index?.questCategories(name, act, str(quest.slug)) ?? [];
+    // Static quest metadata is sometimes unavailable or out of sync with the build page.
+    // The reward text itself is a reliable fallback for passive skill point rewards.
+    if (/\bpassive skill points?\b/i.test(reward) && !categories.includes('skill-points')) categories.push('skill-points');
     if (choices > 1 && !categories.includes('choices')) categories.push('choices');
     acts.get(act)!.quests.push({ name, area: str(quest.area), reward, isChoice: choices > 1, categories });
   }

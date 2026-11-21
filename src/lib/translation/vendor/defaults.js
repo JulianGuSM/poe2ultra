@@ -59,7 +59,7 @@ export const DEFAULTS = {
   panelWidth: 400,
   maxChars: 8000, // 单次最多送出的字符数
   stream: true, // 流式输出
-  showPrompt: true, // 面板里折叠展示本次实际发出的 prompt
+  showPrompt: false, // 面板里折叠展示本次实际发出的 prompt
 
   // —— 费用估算（单位：元 / 百万 tokens，仅 costModel=custom 时使用）——
   showCost: true,

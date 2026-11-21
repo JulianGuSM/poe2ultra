@@ -15,7 +15,7 @@ export interface StaticIndex {
   passive(slug: string): StaticEntry | null;
   passiveSlugOfNode(nodeSlug: string): string | null;
   passiveOfNode(nodeSlug: string): StaticEntry | null;
-  questCategories(name: string, act: string): QuestRewardCategory[];
+  questCategories(name: string, act: string, slug?: string | null): QuestRewardCategory[];
 }
 
 const ITEM_CATEGORIES = [
@@ -67,9 +67,11 @@ export function createStaticIndex(staticData: RawStaticData | null): StaticIndex
   }
 
   const find = (map: Map<string, StaticEntry>) => (slug: string) => map.get(slug) ?? null;
-  const questCategories = (name: string, act: string): QuestRewardCategory[] => {
+  const questCategories = (name: string, act: string, slug?: string | null): QuestRewardCategory[] => {
     const normalizedName = name.trim().toLocaleLowerCase();
-    const entry = quests.find((quest) => str(quest.name)?.trim().toLocaleLowerCase() === normalizedName && str(quest.act)?.trim().toLocaleLowerCase() === act.trim().toLocaleLowerCase());
+    const normalizedSlug = slug?.trim().toLocaleLowerCase();
+    const entry = (normalizedSlug ? quests.find((quest) => str(quest.slug)?.trim().toLocaleLowerCase() === normalizedSlug) : undefined)
+      ?? quests.find((quest) => str(quest.name)?.trim().toLocaleLowerCase() === normalizedName && str(quest.act)?.trim().toLocaleLowerCase() === act.trim().toLocaleLowerCase());
     if (!entry || !Array.isArray(entry.tags)) return [];
     const valid = new Set<QuestRewardCategory>(['choices', 'skill-points', 'character-upgrades']);
     return [...new Set(entry.tags.flatMap((tag) => {
