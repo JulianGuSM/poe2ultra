@@ -6,7 +6,6 @@ import { manifestFor } from './src/lib/build/manifest';
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
 // Set when signing a tester package unlisted while the release waits for review (.github/workflows/sign-xpi.yml).
 const firefoxBuild = process.env.FIREFOX_BUILD ? Number(process.env.FIREFOX_BUILD) : undefined;
-const chromeStoreBuild = process.env.POE2ULTRA_CHROME_FLAVOR === 'store';
 
 export default defineConfig({
   srcDir: 'src',
@@ -26,14 +25,5 @@ export default defineConfig({
       if (popup !== -1) entrypoints.splice(popup, 1);
     },
   },
-  vite: () => ({
-    plugins: [preact(), {
-      name: 'poe2ultra-chrome-build-variant',
-      transformIndexHtml(html) {
-        const marker = 'data-personal-build-only';
-        if (!chromeStoreBuild || !html.includes(marker)) return html;
-        return html.replace(/<button\b(?=[^>]*\bdata-personal-build-only\b)[^>]*>[\s\S]*?<\/button>/, '');
-      },
-    }],
-  }),
+  vite: () => ({ plugins: [preact()] }),
 });

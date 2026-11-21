@@ -16,7 +16,7 @@ const releaseDir = join(outputDir, 'releases');
 mkdirSync(releaseDir, { recursive: true });
 
 for (const variant of variants) {
-  const env = { ...process.env, POE2ULTRA_CHROME_FLAVOR: variant };
+  const env = { ...process.env };
   const npmCli = process.env.npm_execpath;
   const command = npmCli
     ? { executable: process.execPath, args: [npmCli, 'run', 'zip:raw'] }
@@ -41,9 +41,7 @@ for (const variant of variants) {
   if (!existsSync(manifestPath) || !existsSync(optionsPath)) throw new Error(`WXT 未生成完整的未打包扩展目录：${unpackedSource}`);
   const optionsHtml = readFileSync(optionsPath, 'utf8');
   const hasCsvExport = optionsHtml.includes('btn-translations-csv-export');
-  if (hasCsvExport !== (variant === 'personal')) {
-    throw new Error(`${variant} 版本中的 CSV 导出按钮与构建目标不匹配，未复制未打包目录。`);
-  }
+  if (!hasCsvExport) throw new Error(`${variant} 版本缺少 CSV 导出按钮，未复制未打包目录。`);
 
   const unpackedDestination = join(releaseDir, `poe2ultra-${version}-chrome-${variant}-unpacked`);
   const safeReleaseDir = resolve(releaseDir) + sep;
