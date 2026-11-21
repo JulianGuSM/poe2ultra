@@ -32,6 +32,7 @@ When updating, replace the files in the existing extension folder and click **Re
 1. Open poe2ultra settings from the extension icon or the guide's settings control.
 2. Add an API key and save your provider settings. DeepSeek is the default endpoint; compatible custom endpoints can be configured.
 3. Return to a guide and start translation from the translation progress control. The extension creates both Chinese versions in batches.
+   ![Translation progress control and the Continue Translation button](docs/images/translation-progress-control.png)
 4. Use the language switch to show or hide cached translations. Switching languages does not itself send a translation request.
 
 Selection translation is opt-in by website. Add allowed URL patterns under **Selection & panel** in settings, save, then refresh the matching page. Automatic translation on text selection is off by default.
