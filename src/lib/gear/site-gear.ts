@@ -22,6 +22,7 @@ export function embedSiteGear({
   jewelIcons,
   itemTradeUrls,
   socketableCounts,
+  tradeLinkFor,
   onSelectItem,
   onSelectJewel,
   onSelectSocketable,
@@ -35,6 +36,7 @@ export function embedSiteGear({
   jewelIcons: Map<string, number[]>;
   itemTradeUrls: (string | null)[];
   socketableCounts: number[];
+  tradeLinkFor: (source: string) => { url?: string; error?: string };
   onSelectItem: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
   onSelectJewel: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
   onSelectSocketable: (equipmentIndex: number, socketableIndex: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
@@ -49,6 +51,7 @@ export function embedSiteGear({
   let destroyed = false;
   let moveFrame: number | null = null;
   const containers = new Map<HTMLElement, string>();
+  const sourceTradeUrls = new Map<HTMLAnchorElement, string>();
   const scroller = placeholder.closest<HTMLElement>('.build-view__panel');
   const originalStageHeight = placeholder.style.getPropertyValue('--gear-native-height');
   const originalStageHeightPriority = placeholder.style.getPropertyPriority('--gear-native-height');
@@ -72,6 +75,10 @@ export function embedSiteGear({
   };
 
   const release = () => {
+    for (const [anchor, source] of sourceTradeUrls) {
+      if (anchor.isConnected && anchor.href !== source) anchor.href = source;
+    }
+    sourceTradeUrls.clear();
     for (const element of [board, setControls]) {
       if (!element) continue;
       if (element.style === null) element.element.removeAttribute('style');
@@ -144,6 +151,19 @@ export function embedSiteGear({
     }
     const section = found.section;
     const links = [...section.querySelectorAll<HTMLElement>('a[href*="trade2/search"]')];
+    for (const link of links) {
+      const anchor = link as HTMLAnchorElement;
+      let source = sourceTradeUrls.get(anchor);
+      if (!source) {
+        const href = normalizeUrlWithQuery(anchor.href, doc.baseURI);
+        source = itemTradeUrls.find(value => value !== null && normalizeUrlWithQuery(value, doc.baseURI) === href) ?? undefined;
+        if (source) sourceTradeUrls.set(anchor, source);
+      }
+      if (!source) continue;
+      const destination = tradeLinkFor(source);
+      const target = destination.url ?? source;
+      if (anchor.href !== target) anchor.href = target;
+    }
     const radioGroup = section.querySelector<HTMLElement>('[role="radiogroup"]');
     const boardElement = links.length ? commonAncestor(links) : null;
     const radios = [...section.querySelectorAll<HTMLElement>('[role="radio"]')];
@@ -241,12 +261,15 @@ export function embedSiteGear({
   win.addEventListener('wheel', onWheel, { capture: true, passive: false });
 
   let pending = false;
-  const observer = new MutationObserver(() => {
+  const observer = new MutationObserver((records) => {
+    if (!records.some((record) => record.type === 'childList' ||
+      (record.type === 'attributes' && record.attributeName === 'href' && record.target instanceof HTMLAnchorElement &&
+        record.target.matches('a[href*="trade2/search"]')))) return;
     if (pending) return;
     pending = true;
     queueMicrotask(() => { pending = false; sync(); });
   });
-  observer.observe(doc.body, { childList: true, subtree: true });
+  observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
   const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(placeImmediately);
   resizeObserver?.observe(placeholder);
   const boardResizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {

@@ -10,6 +10,7 @@ import { RichText } from '@/ui/rich-text/RichText';
 import { entityChipRenderer } from '@/ui/tooltip/EntityTooltipChip';
 import { TooltipLauncher, WithTooltip } from '@/ui/tooltip/Tooltip';
 import { embedSiteGear, type GearEmbed, type GearEmbedStatus } from '@/lib/gear/site-gear';
+import { useTradeLinks } from '@/ui/gear/useTradeLinks';
 
 const EMPTY = "The author hasn't listed gear for this variant.";
 
@@ -61,6 +62,7 @@ export type EmbedGear = (options: {
   onSelectItem: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
   onSelectJewel: (index: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
   onSelectSocketable: (equipmentIndex: number, socketableIndex: number, anchor: HTMLElement, portalParent: HTMLElement) => void;
+  tradeLinkFor: (source: string) => { url?: string; error?: string };
   onStatus: (status: GearEmbedStatus) => void;
 }) => GearEmbed;
 
@@ -72,6 +74,9 @@ function SiteEquipment({ variant, variantIndex, priorityCollapsed, embedGear = e
   priorityCollapsed: boolean;
   embedGear?: EmbedGear;
 }) {
+  const tradeLinkFor = useTradeLinks(variant.equipment);
+  const tradeLinkForRef = useRef(tradeLinkFor);
+  tradeLinkForRef.current = tradeLinkFor;
   const stage = useRef<HTMLDivElement>(null);
   const embed = useRef<GearEmbed | null>(null);
   const shownIndex = useRef(variantIndex);
@@ -113,6 +118,7 @@ function SiteEquipment({ variant, variantIndex, priorityCollapsed, embedGear = e
       jewelIcons: jewelIconIndices,
       itemTradeUrls,
       socketableCounts,
+      tradeLinkFor: (source) => tradeLinkForRef.current(source),
       onSelectItem: (equipmentIndex, anchor, portalParent) => setDetail({ equipmentIndex, socketableIndex: null, jewelIndex: null, anchor, portalParent }),
       onSelectJewel: (jewelIndex, anchor, portalParent) => setDetail({ equipmentIndex: -1, socketableIndex: null, jewelIndex, anchor, portalParent }),
       onSelectSocketable: (equipmentIndex, socketableIndex, anchor, portalParent) => {
@@ -141,6 +147,10 @@ function SiteEquipment({ variant, variantIndex, priorityCollapsed, embedGear = e
       embed.current = null;
     };
   }, [embedGear, iconIndices, jewelIconIndices, itemTradeUrls, socketableCounts, variant.equipment, variant.jewels]);
+
+  useEffect(() => {
+    embed.current?.sync();
+  }, [tradeLinkFor]);
 
   useEffect(() => {
     if (previousCollapse.current === priorityCollapsed) return;
